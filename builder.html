@@ -22,9 +22,11 @@
 
     <main>
         <div id="builder-board">
-            </div>
+            <!-- Board is generated via JavaScript -->
+        </div>
     </main>
 
+    <!-- Edit Clue Modal -->
     <div id="clue-modal" class="hidden">
         <div class="modal-content">
             <h2 id="modal-title">Edit Clue - 100 Points</h2>
@@ -32,7 +34,9 @@
             <label>Media Type:</label>
             <select id="clue-type">
                 <option value="text">Standard Text</option>
-                <option value="image">Image (URL or Local Path)</option>
+                <option value="image">Image(s) (Comma-separate for multiple)</option>
+                <option value="video">Local Video (e.g., media/clip.mp4)</option>
+                <option value="audio">Local Audio (e.g., media/song.mp3)</option>
                 <option value="youtube">YouTube Video</option>
                 <option value="spotify">Spotify Track</option>
             </select>

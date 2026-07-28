@@ -125,7 +125,36 @@ function handleClueClick(col, row, clue, cellElement) {
     const mediaContainer = document.getElementById('mod-media-container');
     mediaContainer.innerHTML = ''; 
     
-    if (clue.type === 'spotify' && clue.url) {
+    if (clue.type === 'image' && clue.url) {
+        // Multi-image preview for moderator
+        const urls = clue.url.split(',').map(u => u.trim());
+        urls.forEach(url => {
+            const img = document.createElement('img');
+            img.src = url;
+            img.style.maxWidth = "45%";
+            img.style.maxHeight = "150px";
+            img.style.marginRight = "10px";
+            img.style.borderRadius = "8px";
+            mediaContainer.appendChild(img);
+        });
+    }
+    else if (clue.type === 'video' && clue.url) {
+        const vid = document.createElement('video');
+        vid.src = clue.url;
+        vid.controls = true;
+        vid.style.maxWidth = "100%";
+        vid.style.maxHeight = "200px";
+        vid.style.borderRadius = "8px";
+        mediaContainer.appendChild(vid);
+    }
+    else if (clue.type === 'audio' && clue.url) {
+        const aud = document.createElement('audio');
+        aud.src = clue.url;
+        aud.controls = true;
+        aud.style.width = "100%";
+        mediaContainer.appendChild(aud);
+    }
+    else if (clue.type === 'spotify' && clue.url) {
         let trackId = "";
         if (clue.url.includes("track/")) {
             trackId = clue.url.split('track/')[1].split('?')[0];

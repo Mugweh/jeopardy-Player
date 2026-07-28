@@ -1,4 +1,4 @@
-// NEW: Connect to the Python WebSocket Server
+// Connect to the Python WebSocket Server
 const socket = io();
 
 const gameChannel = {
@@ -51,13 +51,42 @@ gameChannel.onmessage = (event) => {
         if (existingMedia) existingMedia.remove();
 
         if (message.mediaType === 'image' && message.mediaUrl) {
-            const img = document.createElement('img');
-            img.src = message.mediaUrl;
-            img.className = 'clue-image';
-            img.id = 'media-container';
-            overlay.insertBefore(img, textContainer);
+            // Split by comma to support multiple images
+            const urls = message.mediaUrl.split(',').map(u => u.trim());
+            const gallery = document.createElement('div');
+            gallery.id = 'media-container'; // Use the same ID so existing cleanup works
+            gallery.className = urls.length > 1 ? 'media-gallery' : '';
+            
+            urls.forEach(url => {
+                const img = document.createElement('img');
+                img.src = url;
+                img.className = urls.length > 1 ? 'clue-image-multi' : 'clue-image';
+                gallery.appendChild(img);
+            });
+            
+            overlay.insertBefore(gallery, textContainer);
             textContainer.textContent = message.prompt;
         } 
+        else if (message.mediaType === 'video' && message.mediaUrl) {
+            // Add a video player that auto-plays
+            const vid = document.createElement('video');
+            vid.src = message.mediaUrl;
+            vid.autoplay = true;
+            vid.className = 'clue-video';
+            vid.id = 'media-container'; 
+            overlay.insertBefore(vid, textContainer);
+            textContainer.textContent = message.prompt;
+        }
+        else if (message.mediaType === 'audio' && message.mediaUrl) {
+            // Add an invisible audio player that auto-plays
+            const aud = document.createElement('audio');
+            aud.src = message.mediaUrl;
+            aud.autoplay = true;
+            aud.id = 'media-container';
+            aud.style.display = 'none'; 
+            overlay.insertBefore(aud, textContainer);
+            textContainer.innerHTML = "🎧 <em>Listening to Audio Clue...</em><br><br>" + message.prompt;
+        }
         else if (message.mediaType === 'youtube' || message.mediaType === 'spotify') {
             textContainer.innerHTML = "🎧 <em>Listening to Audio Clue...</em><br><br>" + message.prompt;
         }
