@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Trivia Builder - Game CMS</title>
+    <link rel="stylesheet" href="builder.css">
+</head>
+<body>
+
+    <header>
+        <div class="title-container">
+            <label>Game Title:</label>
+            <input type="text" id="game-title" value="New Jeopardy Game">
+        </div>
+        <div class="controls">
+            <input type="file" id="import-file" accept=".json" style="display: none;">
+            <button id="btn-import" onclick="document.getElementById('import-file').click()">Load Existing JSON</button>
+            <button id="btn-export">Export game.json</button>
+        </div>
+    </header>
+
+    <main>
+        <div id="builder-board">
+            <!-- Board is generated via JavaScript -->
+        </div>
+    </main>
+
+    <!-- Edit Clue Modal -->
+    <div id="clue-modal" class="hidden">
+        <div class="modal-content">
+            <h2 id="modal-title">Edit Clue - 100 Points</h2>
+            
+            <label>Media Type:</label>
+            <select id="clue-type">
+                <option value="text">Standard Text</option>
+                <option value="image">Image(s) (Comma-separate for multiple)</option>
+                <option value="video">Local Video (e.g., media/clip.mp4)</option>
+                <option value="audio">Local Audio (e.g., media/song.mp3)</option>
+                <option value="youtube">YouTube Video</option>
+                <option value="spotify">Spotify Track</option>
+            </select>
+
+            <div id="url-container" class="hidden">
+                <label>Media URL / Path:</label>
+                <input type="text" id="clue-url" placeholder="e.g., https://youtu.be/... or images/pic.jpg">
+            </div>
+
+            <label>Prompt (The Question):</label>
+            <textarea id="clue-prompt" rows="3" placeholder="Enter the prompt here..."></textarea>
+
+            <label>Response (The Answer):</label>
+            <input type="text" id="clue-response" placeholder="Enter the correct answer...">
+
+            <div class="modal-actions">
+                <button id="btn-cancel" class="btn-secondary">Cancel</button>
+                <button id="btn-save-clue" class="btn-primary">Save Clue</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="builder.js"></script>
+</body>
+</html>

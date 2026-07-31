@@ -1,6 +1,19 @@
-const gameChannel = new BroadcastChannel('jeopardy_game');
+// Connect to the Python WebSocket Server
+const socket = io();
 
-// Let the moderator window know the player screen is open
+const gameChannel = {
+    postMessage: (data) => {
+        socket.emit('game_event', data);
+    }
+};
+
+socket.on('game_event', (data) => {
+    if (typeof gameChannel.onmessage === 'function') {
+        gameChannel.onmessage({ data: data });
+    }
+});
+
+// --- EXISTING GAME LOGIC ---
 gameChannel.postMessage({ type: 'PLAYER_READY' });
 
 gameChannel.onmessage = (event) => {
@@ -9,6 +22,22 @@ gameChannel.onmessage = (event) => {
     if (message.type === 'LOAD_GAME') {
         buildPlayerBoard(message.data);
     } 
+    else if (message.type === 'SHOW_DAILY_DOUBLE') {
+        if (message.clueId) {
+             const gridCell = document.getElementById(message.clueId);
+             if (gridCell) gridCell.classList.add('answered');
+        }
+        
+        const overlay = document.getElementById('active-clue-overlay');
+        const textContainer = document.getElementById('clue-text');
+        
+        const existingMedia = document.getElementById('media-container');
+        if (existingMedia) existingMedia.remove();
+
+        textContainer.innerHTML = "<div style='font-size: 8vw; color: var(--neon-yellow); text-transform: uppercase; font-weight: 900; letter-spacing: 5px; text-shadow: 0 0 30px rgba(255, 204, 0, 0.8), 5px 5px 10px rgba(0,0,0,1);'>Daily Double</div>";
+
+        overlay.classList.add('show-overlay');
+    }
     else if (message.type === 'SHOW_PROMPT') {
         if (message.clueId) {
              const gridCell = document.getElementById(message.clueId);
@@ -18,43 +47,61 @@ gameChannel.onmessage = (event) => {
         const overlay = document.getElementById('active-clue-overlay');
         const textContainer = document.getElementById('clue-text');
         
-        // Clear any old media
         const existingMedia = document.getElementById('media-container');
         if (existingMedia) existingMedia.remove();
 
-       // 1. Handle Images (Keep this exactly as it is)
         if (message.mediaType === 'image' && message.mediaUrl) {
-            const img = document.createElement('img');
-            img.src = message.mediaUrl;
-            img.className = 'clue-image';
-            img.id = 'media-container';
-            overlay.insertBefore(img, textContainer);
+            // Split by comma to support multiple images
+            const urls = message.mediaUrl.split(',').map(u => u.trim());
+            const gallery = document.createElement('div');
+            gallery.id = 'media-container'; // Use the same ID so existing cleanup works
+            gallery.className = urls.length > 1 ? 'media-gallery' : '';
+            
+            urls.forEach(url => {
+                const img = document.createElement('img');
+                img.src = url;
+                img.className = urls.length > 1 ? 'clue-image-multi' : 'clue-image';
+                gallery.appendChild(img);
+            });
+            
+            overlay.insertBefore(gallery, textContainer);
             textContainer.textContent = message.prompt;
         } 
-        
-        // 2. Handle YouTube and Spotify Audio (Host controls them via the Moderator Screen!)
+        else if (message.mediaType === 'video' && message.mediaUrl) {
+            // Add a video player that auto-plays
+            const vid = document.createElement('video');
+            vid.src = message.mediaUrl;
+            vid.autoplay = true;
+            vid.className = 'clue-video';
+            vid.id = 'media-container'; 
+            overlay.insertBefore(vid, textContainer);
+            textContainer.textContent = message.prompt;
+        }
+        else if (message.mediaType === 'audio' && message.mediaUrl) {
+            // Add an invisible audio player that auto-plays
+            const aud = document.createElement('audio');
+            aud.src = message.mediaUrl;
+            aud.autoplay = true;
+            aud.id = 'media-container';
+            aud.style.display = 'none'; 
+            overlay.insertBefore(aud, textContainer);
+            textContainer.innerHTML = "🎧 <em>Listening to Audio Clue...</em><br><br>" + message.prompt;
+        }
         else if (message.mediaType === 'youtube' || message.mediaType === 'spotify') {
             textContainer.innerHTML = "🎧 <em>Listening to Audio Clue...</em><br><br>" + message.prompt;
         }
-        
-        // Command 6: Reset the board
         else if (message.type === 'RESET_GAME') {
-            // Remove the 'answered' class from every point cell to make them visible again
             document.querySelectorAll('.cell.points').forEach(cell => {
                 cell.classList.remove('answered');
             });
             
-            // Force the overlay to close just in case a question was left open
             document.getElementById('active-clue-overlay').classList.remove('show-overlay');
             
-            // Destroy any media currently playing
             const existingMedia = document.getElementById('media-container');
             if (existingMedia) existingMedia.remove();
         }
-        
-        // 3. Handle Standard Text
         else {
-            textContainer.innerHTML = message.prompt.replace(/\n/g, '<br>'); // Supports new lines
+            textContainer.innerHTML = message.prompt.replace(/\n/g, '<br>'); 
         }
 
         overlay.classList.add('show-overlay');
@@ -62,7 +109,6 @@ gameChannel.onmessage = (event) => {
     else if (message.type === 'SHOW_ANSWER') {
         document.getElementById('clue-text').textContent = message.answer;
     } 
-   // Destroy the iframe to stop the audio when we close the clue
     else if (message.type === 'CLOSE_CLUE') {
         const overlay = document.getElementById('active-clue-overlay');
         overlay.classList.remove('show-overlay');
@@ -73,27 +119,71 @@ gameChannel.onmessage = (event) => {
     else if (message.type === 'UPDATE_SCORES') {
         const scoreBoard = document.getElementById('score-board');
         
-        // Check if we need to create new team blocks on the big screen
+        while (scoreBoard.children.length > message.teams.length) {
+            scoreBoard.removeChild(scoreBoard.lastChild);
+        }
+
         while (scoreBoard.children.length < message.teams.length) {
-            const newIndex = scoreBoard.children.length;
             const newTeamDiv = document.createElement('div');
             newTeamDiv.className = 'player-team';
-            newTeamDiv.id = `display-team-${newIndex}`;
             newTeamDiv.innerHTML = `
-                <div class="team-name">Team ${newIndex + 1}</div>
-                <div class="team-score">0</div>
+                <div class="team-name"></div>
+                <div class="team-score"></div>
             `;
             scoreBoard.appendChild(newTeamDiv);
         }
 
-        // Now update the text and numbers for all teams
         message.teams.forEach((team, index) => {
-            const teamDiv = document.getElementById(`display-team-${index}`);
+            const teamDiv = scoreBoard.children[index];
             if (teamDiv) {
+                teamDiv.id = `display-team-${index}`; 
                 teamDiv.querySelector('.team-name').textContent = team.name;
                 teamDiv.querySelector('.team-score').textContent = team.score;
             }
         });
+    }
+    else if (message.type === 'SHOW_FJ_CATEGORY') {
+        const overlay = document.getElementById('active-clue-overlay');
+        const textContainer = document.getElementById('clue-text');
+        
+        const existingMedia = document.getElementById('media-container');
+        if (existingMedia) existingMedia.remove();
+
+        textContainer.innerHTML = `
+            <div style='font-size: 4vw; color: #b0b0b0; text-transform: uppercase; font-weight: 700; letter-spacing: 2px;'>Final Jeopardy Category</div>
+            <div style='font-size: 7vw; color: var(--neon-yellow); text-transform: uppercase; font-weight: 900; margin-top: 15px; text-shadow: 0 0 20px rgba(255,204,0,0.5);'>${message.category}</div>
+        `;
+        overlay.classList.add('show-overlay');
+    }
+    else if (message.type === 'SHOW_FJ_PROMPT') {
+        const overlay = document.getElementById('active-clue-overlay');
+        const textContainer = document.getElementById('clue-text');
+        
+        textContainer.innerHTML = message.prompt.replace(/\n/g, '<br>');
+        overlay.classList.add('show-overlay');
+    }
+    else if (message.type === 'SHOW_FJ_ANSWER') {
+        const textContainer = document.getElementById('clue-text');
+        
+        textContainer.innerHTML += `<br><br><span style="color: #10b981; font-size: 4vw; text-shadow: 0 0 15px rgba(16, 185, 129, 0.5);">${message.answer.replace(/\n/g, '<br>')}</span>`;
+    }
+    else if (message.type === 'SYNC_TIMER') {
+        const timerEl = document.getElementById('player-timer');
+        timerEl.classList.remove('hidden');
+        timerEl.textContent = message.time;
+        
+        if (message.time <= 0) {
+            timerEl.classList.add('time-up');
+        } else {
+            timerEl.classList.remove('time-up');
+        }
+    }
+    else if (message.type === 'HIDE_TIMER') {
+        const timerEl = document.getElementById('player-timer');
+        if (timerEl) {
+            timerEl.classList.add('hidden');
+            timerEl.classList.remove('time-up');
+        }
     }
 };
 

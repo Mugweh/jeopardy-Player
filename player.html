@@ -8,8 +8,7 @@
 </head>
 <body>
 
-    <div id="game-board">
-        </div>
+    <div id="game-board"></div>
 
     <div id="score-board">
         <div class="player-team" id="display-team-0">
@@ -26,10 +25,13 @@
         </div>
     </div>
 
+    <div id="player-timer" class="hidden">30</div>
+
     <div id="active-clue-overlay">
         <span id="clue-text">This is where the big question will appear!</span>
     </div>
 
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
     <script src="player.js"></script>
 </body>
 </html>

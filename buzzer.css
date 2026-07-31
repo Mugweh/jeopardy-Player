@@ -1,0 +1,33 @@
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@700;900&display=swap');
+
+body {
+    margin: 0; padding: 0; font-family: 'Poppins', sans-serif;
+    height: 100vh; overflow: hidden; background: #121212; color: white;
+    display: flex; justify-content: center; align-items: center; text-align: center;
+    user-select: none; 
+}
+
+#setup-screen, #buzzer-screen {
+    width: 100vw; height: 100vh; display: flex; flex-direction: column;
+    justify-content: center; align-items: center;
+}
+
+.hidden { display: none !important; }
+
+/* Setup Screen */
+input, button {
+    padding: 15px 30px; font-size: 2rem; margin: 10px;
+    border-radius: 10px; font-family: 'Poppins', sans-serif; text-align: center;
+}
+button { background: #3b82f6; color: white; border: none; cursor: pointer; }
+
+/* Buzzer Screen States */
+#buzzer-screen { transition: background 0.1s; }
+#buzzer-status { font-size: 8vw; font-weight: 900; text-transform: uppercase; text-shadow: 2px 2px 10px rgba(0,0,0,0.5); padding: 20px;}
+
+.waiting { background: #555555; cursor: not-allowed; }
+.active { background: #10b981; cursor: pointer; } 
+.active:active { background: #059669; }
+.first { background: #060ce9; } 
+.late { background: #ffcc00; color: #121212; } 
+.locked { background: #ef4444; }

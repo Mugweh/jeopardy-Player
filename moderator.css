@@ -252,3 +252,32 @@ main {
         height: 50vh; /* Give board fixed height on small screens */
     }
 }
+
+/* Daily Double Styling for Host View */
+.cell.points.daily-double-mod {
+    background-color: #8a0303;
+    border-color: var(--neon-yellow);
+    flex-direction: column;
+}
+
+/* Remove Team Button */
+.remove-team {
+    background-color: var(--accent-red) !important;
+    padding: 4px 10px !important;
+    margin-left: 8px;
+    font-size: 1rem;
+}
+.remove-team:hover {
+    background-color: var(--accent-red-hover) !important;
+}
+
+/* Bonus Button Styling */
+.bonus-plus {
+    background-color: var(--accent-blue) !important;
+    padding: 4px 10px !important;
+    margin-left: 5px;
+    font-size: 1rem;
+}
+.bonus-plus:hover {
+    background-color: var(--accent-blue-hover) !important;
+}

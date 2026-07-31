@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Team Buzzer</title>
+    <link rel="stylesheet" href="buzzer.css">
+</head>
+<body>
+    <div id="setup-screen">
+        <h1>Join Game</h1>
+        <input type="text" id="team-name" placeholder="Enter your Team Name" value="Team 1">
+        <button id="btn-join">Ready to Play</button>
+    </div>
+
+    <div id="buzzer-screen" class="hidden waiting">
+        <div id="buzzer-status">WAITING FOR QUESTION...</div>
+    </div>
+
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+    <script src="buzzer.js"></script>
+</body>
+</html>
