@@ -1,7 +1,6 @@
 // Connect to the Python WebSocket Server
 const socket = io();
 
-// FAKE the old BroadcastChannel so the rest of the code works natively
 const gameChannel = {
     postMessage: (data) => {
         socket.emit('game_event', data);
@@ -28,9 +27,56 @@ document.getElementById('game-file').addEventListener('change', handleFileUpload
 gameChannel.onmessage = (event) => {
     const message = event.data;
     
-    if (message.type === 'PLAYER_READY' && gameData) {
-        gameChannel.postMessage({ type: 'LOAD_GAME', data: gameData });
-        setTimeout(broadcastScores, 500);
+    if (message.type === 'SYNC_FULL_STATE') {
+        const state = message.state;
+
+        if (state.gameData) {
+            gameData = state.gameData;
+            buildModeratorBoard(gameData);
+
+            // Re-grey out answered clues
+            state.answeredClues.forEach(clueId => {
+                const parts = clueId.split('-');
+                if(parts.length === 3) {
+                    const modCell = document.getElementById(`mod-clue-${parts[1]}-${parts[2]}`);
+                    if (modCell) modCell.classList.add('answered');
+                }
+            });
+        }
+        if (state.teams && state.teams.length > 0) {
+            syncModeratorScoresUI(state.teams);
+        }
+        buzzerOrder = state.buzzerOrder || [];
+        renderBuzzerList();
+        
+        // If there was an active clue running, silently update moderator panel
+        if (state.activeOverlay && state.activeOverlay.clueId && gameData) {
+            const parts = state.activeOverlay.clueId.split('-');
+            const clue = gameData.categories[parts[1]].clues[parts[2]];
+            displayClueDetailsMod(parts[1], parts[2], clue, state.activeOverlay.type === 'SHOW_DAILY_DOUBLE');
+        }
+    }
+    else if (message.type === 'LOAD_GAME') {
+        gameData = message.data;
+        buildModeratorBoard(gameData);
+    }
+    else if (message.type === 'UPDATE_SCORES') {
+        syncModeratorScoresUI(message.teams);
+    }
+    else if (message.type === 'SHOW_PROMPT' || message.type === 'SHOW_DAILY_DOUBLE') {
+        if (message.clueId && gameData && activeClueId !== message.clueId) {
+            const parts = message.clueId.split('-');
+            const clue = gameData.categories[parts[1]].clues[parts[2]];
+            displayClueDetailsMod(parts[1], parts[2], clue, message.type === 'SHOW_DAILY_DOUBLE');
+            document.getElementById(`mod-clue-${parts[1]}-${parts[2]}`).classList.add('answered');
+        }
+    }
+    else if (message.type === 'CLOSE_CLUE' || message.type === 'RESET_GAME') {
+        resetModPanelUI();
+        if (message.type === 'RESET_GAME') {
+            document.querySelectorAll('.cell.points').forEach(cell => cell.classList.remove('answered'));
+            document.querySelectorAll('.team .score').forEach(score => score.textContent = '0');
+        }
     }
     else if (message.type === 'BUZZ_IN') {
         if (!buzzerOrder.includes(message.team)) {
@@ -49,6 +95,12 @@ function handleFileUpload(event) {
     reader.onload = (e) => {
         try {
             gameData = JSON.parse(e.target.result);
+            
+            // FIX: Generate Daily Double ONCE here, before syncing it to other clients
+            const randomCol = Math.floor(Math.random() * gameData.categories.length);
+            const randomRow = Math.floor(Math.random() * 5);
+            gameData.dailyDoubleId = `clue-${randomCol}-${randomRow}`;
+
             buildModeratorBoard(gameData);
             gameChannel.postMessage({ type: 'LOAD_GAME', data: gameData });
             setTimeout(broadcastScores, 500); 
@@ -63,9 +115,13 @@ function buildModeratorBoard(data) {
     const board = document.getElementById('mini-board');
     board.innerHTML = ''; 
 
-    const randomCol = Math.floor(Math.random() * data.categories.length);
-    const randomRow = Math.floor(Math.random() * 5);
-    dailyDoubleId = `clue-${randomCol}-${randomRow}`;
+    // Retrieve or set the Daily Double properly
+    if (data.dailyDoubleId) {
+        dailyDoubleId = data.dailyDoubleId;
+    } else {
+        dailyDoubleId = `clue-${Math.floor(Math.random() * data.categories.length)}-${Math.floor(Math.random() * 5)}`;
+        data.dailyDoubleId = dailyDoubleId;
+    }
 
     data.categories.forEach(category => {
         const catDiv = document.createElement('div');
@@ -90,7 +146,23 @@ function buildModeratorBoard(data) {
             
             pointsDiv.addEventListener('click', () => {
                 if (!pointsDiv.classList.contains('answered')) {
-                    handleClueClick(col, row, clue, pointsDiv);
+                    pointsDiv.classList.add('answered');
+                    displayClueDetailsMod(col, row, clue, `clue-${col}-${row}` === dailyDoubleId);
+                    
+                    if (`clue-${col}-${row}` === dailyDoubleId) {
+                        gameChannel.postMessage({ type: 'SHOW_DAILY_DOUBLE', clueId: activeClueId });
+                    } else {
+                        gameChannel.postMessage({ 
+                            type: 'SHOW_PROMPT', 
+                            clueId: activeClueId, 
+                            prompt: clue.prompt,
+                            mediaType: clue.type || 'text',
+                            mediaUrl: clue.url || null
+                        });
+                        buzzerOrder = [];
+                        renderBuzzerList();
+                        gameChannel.postMessage({ type: 'ENABLE_BUZZERS' });
+                    }
                 }
             });
             board.appendChild(pointsDiv);
@@ -98,9 +170,10 @@ function buildModeratorBoard(data) {
     }
 }
 
-function handleClueClick(col, row, clue, cellElement) {
-    const isDailyDouble = (`clue-${col}-${row}` === dailyDoubleId);
+// Extracted UI update logic so both click and incoming syncs update perfectly
+function displayClueDetailsMod(col, row, clue, isDailyDouble) {
     const categoryTitle = document.getElementById('current-category');
+    activeClueId = `clue-${col}-${row}`;
 
     if (isDailyDouble) {
         categoryTitle.innerHTML = `
@@ -126,7 +199,6 @@ function handleClueClick(col, row, clue, cellElement) {
     mediaContainer.innerHTML = ''; 
     
     if (clue.type === 'image' && clue.url) {
-        // Multi-image preview for moderator
         const urls = clue.url.split(',').map(u => u.trim());
         urls.forEach(url => {
             const img = document.createElement('img');
@@ -155,64 +227,43 @@ function handleClueClick(col, row, clue, cellElement) {
         mediaContainer.appendChild(aud);
     }
     else if (clue.type === 'spotify' && clue.url) {
-        let trackId = "";
-        if (clue.url.includes("track/")) {
-            trackId = clue.url.split('track/')[1].split('?')[0];
-        }
+        let trackId = clue.url.includes("track/") ? clue.url.split('track/')[1].split('?')[0] : "";
         const iframe = document.createElement('iframe');
         iframe.src = `https://open.spotify.com/embed/track/${trackId}?utm_source=generator&theme=0`;
-        iframe.width = "100%";
-        iframe.height = "152";
+        iframe.width = "100%"; iframe.height = "152";
         iframe.allow = "autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture";
         iframe.style.borderRadius = "12px";
         mediaContainer.appendChild(iframe);
     }
     else if (clue.type === 'youtube' && clue.url) {
-        let videoId = "";
-        if (clue.url.includes("v=")) {
-            videoId = clue.url.split('v=')[1].split('&')[0];
-        } else if (clue.url.includes("youtu.be/")) {
-            videoId = clue.url.split('youtu.be/')[1].split('?')[0];
-        }
+        let videoId = clue.url.includes("v=") ? clue.url.split('v=')[1].split('&')[0] : 
+                      (clue.url.includes("youtu.be/") ? clue.url.split('youtu.be/')[1].split('?')[0] : "");
         if (videoId) {
             const iframe = document.createElement('iframe');
             iframe.src = `https://www.youtube.com/embed/${videoId}?controls=1`;
-            iframe.width = "100%";
-            iframe.height = "200"; 
+            iframe.width = "100%"; iframe.height = "200"; 
             iframe.allow = "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture";
             iframe.allowFullscreen = true;
             iframe.style.borderRadius = "8px";
             mediaContainer.appendChild(iframe);
         }
     }
-    
-    cellElement.classList.add('answered');
-    activeClueId = `clue-${col}-${row}`;
+}
 
-    if (isDailyDouble) {
-        gameChannel.postMessage({ 
-            type: 'SHOW_DAILY_DOUBLE', 
-            clueId: activeClueId 
-        });
-    } else {
-        gameChannel.postMessage({ 
-            type: 'SHOW_PROMPT', 
-            clueId: activeClueId, 
-            prompt: clue.prompt,
-            mediaType: clue.type || 'text',
-            mediaUrl: clue.url || null
-        });
-
-        // Instantly activate buzzers on clue click
-        buzzerOrder = [];
-        renderBuzzerList();
-        gameChannel.postMessage({ type: 'ENABLE_BUZZERS' });
-    }
+function resetModPanelUI() {
+    document.getElementById('current-category').textContent = 'Category - Point Value';
+    document.getElementById('mod-prompt-text').textContent = 'Select a question from the board on the left.';
+    document.getElementById('mod-response-text').textContent = '...';
+    document.getElementById('mod-media-container').innerHTML = '';
+    activeClueId = null;
+    currentClueValue = 0; 
+    if (timerInterval) clearInterval(timerInterval);
+    buzzerOrder = [];
+    renderBuzzerList();
 }
 
 document.getElementById('btn-show-prompt').addEventListener('click', () => {
     if (!activeClueId) return;
-        
     const [_, col, row] = activeClueId.split('-');
     const clue = gameData.categories[col].clues[row];
 
@@ -235,22 +286,33 @@ document.getElementById('btn-show-answer').addEventListener('click', () => {
 
 document.getElementById('btn-close-clue').addEventListener('click', () => {
     gameChannel.postMessage({ type: 'CLOSE_CLUE' });
-    
-    document.getElementById('current-category').textContent = 'Category - Point Value';
-    document.getElementById('mod-prompt-text').textContent = 'Select a question from the board on the left.';
-    document.getElementById('mod-response-text').textContent = '...';
-    document.getElementById('mod-media-container').innerHTML = '';
-
-    activeClueId = null;
-    currentClueValue = 0; 
-    
-    if (timerInterval) clearInterval(timerInterval);
     gameChannel.postMessage({ type: 'HIDE_TIMER' });
-
-    buzzerOrder = [];
-    renderBuzzerList();
     gameChannel.postMessage({ type: 'DISABLE_BUZZERS' });
+    resetModPanelUI();
 });
+
+// Teams Synchronization
+function syncModeratorScoresUI(teamsData) {
+    const teamContainer = document.getElementById('team-scores');
+    document.querySelectorAll('.team').forEach(el => el.remove());
+
+    teamsData.forEach((team, index) => {
+        const newTeam = document.createElement('div');
+        newTeam.className = 'team';
+        newTeam.innerHTML = `
+            <input type="text" value="${team.name}">
+            <div class="score-controls">
+                <button class="minus">-</button>
+                <span class="score">${team.score}</span>
+                <button class="plus">+</button>
+                <button class="bonus-plus" title="Add Bonus">+B</button>
+                <button class="remove-team" title="Remove Team">✖</button>
+            </div>
+        `;
+        teamContainer.insertBefore(newTeam, document.getElementById('btn-add-team'));
+        attachTeamListeners(newTeam);
+    });
+}
 
 function attachTeamListeners(teamDiv) {
     const minusBtn = teamDiv.querySelector('.minus');
@@ -258,7 +320,7 @@ function attachTeamListeners(teamDiv) {
     const scoreDisplay = teamDiv.querySelector('.score');
     const nameInput = teamDiv.querySelector('input');
     const removeBtn = teamDiv.querySelector('.remove-team'); 
-    const bonusBtn = teamDiv.querySelector('.bonus-plus'); // Target bonus button
+    const bonusBtn = teamDiv.querySelector('.bonus-plus'); 
 
     plusBtn.addEventListener('click', () => {
         let score = parseInt(scoreDisplay.textContent, 10) || 0;
@@ -274,7 +336,6 @@ function attachTeamListeners(teamDiv) {
         broadcastScores();
     });
     
-    // Bonus points click listener
     if (bonusBtn) {
         bonusBtn.addEventListener('click', () => {
             let bonusScore = parseInt(document.getElementById('bonus-input').value, 10) || 0;
@@ -302,10 +363,8 @@ document.querySelectorAll('.team').forEach(attachTeamListeners);
 document.getElementById('btn-add-team').addEventListener('click', () => {
     const teamContainer = document.getElementById('team-scores');
     const teamCount = document.querySelectorAll('.team').length + 1; 
-    
     const newTeam = document.createElement('div');
     newTeam.className = 'team';
-    
     newTeam.innerHTML = `
         <input type="text" value="Team ${teamCount}">
         <div class="score-controls">
@@ -316,7 +375,6 @@ document.getElementById('btn-add-team').addEventListener('click', () => {
             <button class="remove-team" title="Remove Team">✖</button>
         </div>
     `;
-    
     teamContainer.insertBefore(newTeam, document.getElementById('btn-add-team'));
     attachTeamListeners(newTeam);
     broadcastScores(); 
@@ -330,36 +388,30 @@ function broadcastScores() {
     gameChannel.postMessage({ type: 'UPDATE_SCORES', teams: teams });
 }
 
+// --- FORCE SYNC LOGIC ---
+document.getElementById('btn-force-sync').addEventListener('click', () => {
+    gameChannel.postMessage({ type: 'FORCE_SYNC' });
+    
+    // Give visual feedback to the moderator
+    const btn = document.getElementById('btn-force-sync');
+    const originalText = btn.textContent;
+    btn.textContent = "Synced!";
+    btn.style.backgroundColor = "var(--accent-green)";
+    
+    setTimeout(() => {
+        btn.textContent = originalText;
+        btn.style.backgroundColor = "var(--accent-blue)";
+    }, 1500);
+});
+
 document.getElementById('btn-reset-game').addEventListener('click', () => {
     if (!confirm("Are you sure you want to reset the game? This will clear all scores and board progress.")) {
         return; 
     }
-
-    document.querySelectorAll('.cell.points').forEach(cell => {
-        cell.classList.remove('answered');
-    });
-
-    document.querySelectorAll('.team').forEach(teamDiv => {
-        teamDiv.querySelector('.score').textContent = '0';
-    });
-
-    document.getElementById('current-category').textContent = 'Category - Point Value';
-    document.getElementById('mod-prompt-text').textContent = 'Select a question from the board on the left.';
-    document.getElementById('mod-response-text').textContent = '...';
-    document.getElementById('mod-media-container').innerHTML = '';
-
-    activeClueId = null;
-    currentClueValue = 0;
-    
-    if (timerInterval) clearInterval(timerInterval);
     gameChannel.postMessage({ type: 'HIDE_TIMER' });
-
-    buzzerOrder = [];
-    renderBuzzerList();
     gameChannel.postMessage({ type: 'DISABLE_BUZZERS' });
-
     gameChannel.postMessage({ type: 'RESET_GAME' });
-    broadcastScores(); 
+    resetModPanelUI();
 });
 
 // --- FINAL JEOPARDY LOGIC ---
@@ -388,7 +440,6 @@ const timerInput = document.getElementById('timer-input');
 
 document.getElementById('btn-start-timer').addEventListener('click', () => {
     if (timerInterval) clearInterval(timerInterval);
-    
     timerSeconds = parseInt(timerInput.value, 10) || 0;
     modTimerDisplay.textContent = timerSeconds;
     gameChannel.postMessage({ type: 'SYNC_TIMER', time: timerSeconds });
@@ -443,17 +494,10 @@ document.getElementById('btn-clear-buzzers').addEventListener('click', () => {
     gameChannel.postMessage({ type: 'ENABLE_BUZZERS' }); 
 });
 
-// --- NEXT IN QUEUE LOGIC ---
 document.getElementById('btn-next-buzzer').addEventListener('click', () => {
     if (buzzerOrder.length > 0) {
-        // Remove the top team from the array
         buzzerOrder.shift(); 
-        
-        // Re-render the list on the host screen
         renderBuzzerList(); 
-        
-        // Broadcast the new order. 
-        // The old #2 becomes #1 (Blue Screen), and the dismissed team gets Locked Out (Red Screen).
         gameChannel.postMessage({ type: 'BUZZER_ORDER', order: buzzerOrder });
     }
 });

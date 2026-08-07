@@ -13,13 +13,36 @@ socket.on('game_event', (data) => {
     }
 });
 
-// --- EXISTING GAME LOGIC ---
-gameChannel.postMessage({ type: 'PLAYER_READY' });
+// --- GAME LOGIC ---
 
 gameChannel.onmessage = (event) => {
     const message = event.data;
 
-    if (message.type === 'LOAD_GAME') {
+    if (message.type === 'SYNC_FULL_STATE') {
+        const state = message.state;
+
+        // Restore Board Data
+        if (state.gameData) {
+            buildPlayerBoard(state.gameData);
+            // Re-grey out clues already answered
+            state.answeredClues.forEach(clueId => {
+                const cell = document.getElementById(clueId);
+                if (cell) cell.classList.add('answered');
+            });
+        }
+        
+        // Restore Scores
+        if (state.teams) {
+            updatePlayerScoresUI(state.teams);
+        }
+
+        // Restore active overlays dynamically
+        if (state.activeOverlay) {
+            // Trick the client into playing the event back as if it just happened
+            gameChannel.onmessage({ data: state.activeOverlay });
+        }
+    }
+    else if (message.type === 'LOAD_GAME') {
         buildPlayerBoard(message.data);
     } 
     else if (message.type === 'SHOW_DAILY_DOUBLE') {
@@ -51,10 +74,9 @@ gameChannel.onmessage = (event) => {
         if (existingMedia) existingMedia.remove();
 
         if (message.mediaType === 'image' && message.mediaUrl) {
-            // Split by comma to support multiple images
             const urls = message.mediaUrl.split(',').map(u => u.trim());
             const gallery = document.createElement('div');
-            gallery.id = 'media-container'; // Use the same ID so existing cleanup works
+            gallery.id = 'media-container'; 
             gallery.className = urls.length > 1 ? 'media-gallery' : '';
             
             urls.forEach(url => {
@@ -68,7 +90,6 @@ gameChannel.onmessage = (event) => {
             textContainer.textContent = message.prompt;
         } 
         else if (message.mediaType === 'video' && message.mediaUrl) {
-            // Add a video player that auto-plays
             const vid = document.createElement('video');
             vid.src = message.mediaUrl;
             vid.autoplay = true;
@@ -78,7 +99,6 @@ gameChannel.onmessage = (event) => {
             textContainer.textContent = message.prompt;
         }
         else if (message.mediaType === 'audio' && message.mediaUrl) {
-            // Add an invisible audio player that auto-plays
             const aud = document.createElement('audio');
             aud.src = message.mediaUrl;
             aud.autoplay = true;
@@ -89,16 +109,6 @@ gameChannel.onmessage = (event) => {
         }
         else if (message.mediaType === 'youtube' || message.mediaType === 'spotify') {
             textContainer.innerHTML = "🎧 <em>Listening to Audio Clue...</em><br><br>" + message.prompt;
-        }
-        else if (message.type === 'RESET_GAME') {
-            document.querySelectorAll('.cell.points').forEach(cell => {
-                cell.classList.remove('answered');
-            });
-            
-            document.getElementById('active-clue-overlay').classList.remove('show-overlay');
-            
-            const existingMedia = document.getElementById('media-container');
-            if (existingMedia) existingMedia.remove();
         }
         else {
             textContainer.innerHTML = message.prompt.replace(/\n/g, '<br>'); 
@@ -117,30 +127,7 @@ gameChannel.onmessage = (event) => {
         if (existingMedia) existingMedia.remove();
     }
     else if (message.type === 'UPDATE_SCORES') {
-        const scoreBoard = document.getElementById('score-board');
-        
-        while (scoreBoard.children.length > message.teams.length) {
-            scoreBoard.removeChild(scoreBoard.lastChild);
-        }
-
-        while (scoreBoard.children.length < message.teams.length) {
-            const newTeamDiv = document.createElement('div');
-            newTeamDiv.className = 'player-team';
-            newTeamDiv.innerHTML = `
-                <div class="team-name"></div>
-                <div class="team-score"></div>
-            `;
-            scoreBoard.appendChild(newTeamDiv);
-        }
-
-        message.teams.forEach((team, index) => {
-            const teamDiv = scoreBoard.children[index];
-            if (teamDiv) {
-                teamDiv.id = `display-team-${index}`; 
-                teamDiv.querySelector('.team-name').textContent = team.name;
-                teamDiv.querySelector('.team-score').textContent = team.score;
-            }
-        });
+        updatePlayerScoresUI(message.teams);
     }
     else if (message.type === 'SHOW_FJ_CATEGORY') {
         const overlay = document.getElementById('active-clue-overlay');
@@ -185,6 +172,12 @@ gameChannel.onmessage = (event) => {
             timerEl.classList.remove('time-up');
         }
     }
+    else if (message.type === 'RESET_GAME') {
+        document.querySelectorAll('.cell.points').forEach(cell => cell.classList.remove('answered'));
+        document.getElementById('active-clue-overlay').classList.remove('show-overlay');
+        const existingMedia = document.getElementById('media-container');
+        if (existingMedia) existingMedia.remove();
+    }
 };
 
 function buildPlayerBoard(data) {
@@ -208,4 +201,32 @@ function buildPlayerBoard(data) {
             board.appendChild(pointsDiv);
         }
     }
+}
+
+// Extracted Helper for Score Updating to keep things DRY
+function updatePlayerScoresUI(teams) {
+    const scoreBoard = document.getElementById('score-board');
+    
+    while (scoreBoard.children.length > teams.length) {
+        scoreBoard.removeChild(scoreBoard.lastChild);
+    }
+
+    while (scoreBoard.children.length < teams.length) {
+        const newTeamDiv = document.createElement('div');
+        newTeamDiv.className = 'player-team';
+        newTeamDiv.innerHTML = `
+            <div class="team-name"></div>
+            <div class="team-score"></div>
+        `;
+        scoreBoard.appendChild(newTeamDiv);
+    }
+
+    teams.forEach((team, index) => {
+        const teamDiv = scoreBoard.children[index];
+        if (teamDiv) {
+            teamDiv.id = `display-team-${index}`; 
+            teamDiv.querySelector('.team-name').textContent = team.name;
+            teamDiv.querySelector('.team-score').textContent = team.score;
+        }
+    });
 }
