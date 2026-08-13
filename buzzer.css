@@ -31,3 +31,21 @@ button { background: #3b82f6; color: white; border: none; cursor: pointer; }
 .first { background: #060ce9; } 
 .late { background: #ffcc00; color: #121212; } 
 .locked { background: #ef4444; }
+
+/* Wager Screen Styles */
+#team-select {
+    padding: 15px; font-size: 1.5rem; margin: 10px;
+    border-radius: 10px; font-family: 'Poppins', sans-serif;
+    width: 80%; max-width: 400px; text-align: center;
+}
+#wager-screen { flex-direction: column; }
+#wager-screen h2 {
+    font-size: 6vw; color: #ffcc00; margin-bottom: 20px; text-transform: uppercase;
+}
+#wager-screen input {
+    font-size: 3rem; width: 60%; text-align: center; padding: 15px;
+    border: 3px solid #ffcc00; background: #222; color: white; border-radius: 12px;
+}
+#btn-submit-wager {
+    background: #10b981; font-size: 2rem; margin-top: 20px; width: 60%; border-radius: 12px;
+}

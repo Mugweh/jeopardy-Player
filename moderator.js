@@ -21,6 +21,7 @@ let dailyDoubleId = null;
 let timerInterval = null; 
 let timerSeconds = 30;
 let buzzerOrder = []; 
+let teamWagers = {}; // NEW: Stores dynamically submitted wagers
 
 document.getElementById('game-file').addEventListener('change', handleFileUpload);
 
@@ -34,7 +35,6 @@ gameChannel.onmessage = (event) => {
             gameData = state.gameData;
             buildModeratorBoard(gameData);
 
-            // Re-grey out answered clues
             state.answeredClues.forEach(clueId => {
                 const parts = clueId.split('-');
                 if(parts.length === 3) {
@@ -43,13 +43,15 @@ gameChannel.onmessage = (event) => {
                 }
             });
         }
+        
+        teamWagers = state.teamWagers || {};
+        
         if (state.teams && state.teams.length > 0) {
             syncModeratorScoresUI(state.teams);
         }
         buzzerOrder = state.buzzerOrder || [];
         renderBuzzerList();
         
-        // If there was an active clue running, silently update moderator panel
         if (state.activeOverlay && state.activeOverlay.clueId && gameData) {
             const parts = state.activeOverlay.clueId.split('-');
             const clue = gameData.categories[parts[1]].clues[parts[2]];
@@ -85,6 +87,22 @@ gameChannel.onmessage = (event) => {
             gameChannel.postMessage({ type: 'BUZZER_ORDER', order: buzzerOrder });
         }
     }
+    else if (message.type === 'SUBMIT_WAGER') {
+        teamWagers[message.team] = message.wager;
+        document.querySelectorAll('.team').forEach(teamDiv => {
+            if (teamDiv.querySelector('input').value === message.team) {
+                teamDiv.querySelector('.wager-display').textContent = `(W: ${message.wager})`;
+            }
+        });
+    }
+    else if (message.type === 'CLEAR_WAGER') {
+        delete teamWagers[message.team];
+        document.querySelectorAll('.team').forEach(teamDiv => {
+            if (teamDiv.querySelector('input').value === message.team) {
+                teamDiv.querySelector('.wager-display').textContent = '';
+            }
+        });
+    }
 };
 
 function handleFileUpload(event) {
@@ -96,7 +114,14 @@ function handleFileUpload(event) {
         try {
             gameData = JSON.parse(e.target.result);
             
-            // FIX: Generate Daily Double ONCE here, before syncing it to other clients
+            if (gameData.finalJeopardy) {
+                document.getElementById('mod-fj-category-text').textContent = gameData.finalJeopardy.category || '...';
+                document.getElementById('mod-fj-prompt-text').textContent = gameData.finalJeopardy.prompt || '...';
+                document.getElementById('mod-fj-answer-text').textContent = gameData.finalJeopardy.answer || '...';
+                
+                renderModeratorMedia(gameData.finalJeopardy, document.getElementById('mod-fj-media-container'));
+            }
+
             const randomCol = Math.floor(Math.random() * gameData.categories.length);
             const randomRow = Math.floor(Math.random() * 5);
             gameData.dailyDoubleId = `clue-${randomCol}-${randomRow}`;
@@ -115,7 +140,6 @@ function buildModeratorBoard(data) {
     const board = document.getElementById('mini-board');
     board.innerHTML = ''; 
 
-    // Retrieve or set the Daily Double properly
     if (data.dailyDoubleId) {
         dailyDoubleId = data.dailyDoubleId;
     } else {
@@ -170,32 +194,7 @@ function buildModeratorBoard(data) {
     }
 }
 
-// Extracted UI update logic so both click and incoming syncs update perfectly
-function displayClueDetailsMod(col, row, clue, isDailyDouble) {
-    const categoryTitle = document.getElementById('current-category');
-    activeClueId = `clue-${col}-${row}`;
-
-    if (isDailyDouble) {
-        categoryTitle.innerHTML = `
-            ${gameData.categories[col].name} - 🚨 [DAILY DOUBLE] 🚨
-            <div style="margin-top: 15px; display: flex; align-items: center; gap: 10px;">
-                <label style="font-size: 0.9rem; color: var(--neon-yellow); text-transform: uppercase; font-weight: bold;">Enter Wager:</label>
-                <input type="number" id="wager-input" placeholder="0" style="padding: 6px; font-size: 1rem; font-family: 'Inter', sans-serif; background: #1a1a1a; color: white; border: 1px solid var(--neon-yellow); border-radius: 4px; width: 120px;">
-            </div>
-        `;
-        currentClueValue = 0;
-        document.getElementById('wager-input').addEventListener('input', (e) => {
-            currentClueValue = parseInt(e.target.value, 10) || 0;
-        });
-    } else {
-        categoryTitle.textContent = `${gameData.categories[col].name} - ${clue.points}`;
-        currentClueValue = parseInt(clue.points, 10) || 0;
-    }
-
-    document.getElementById('mod-prompt-text').textContent = clue.prompt + (clue.url ? ` (${clue.type.toUpperCase()})` : '');
-    document.getElementById('mod-response-text').textContent = clue.response;
-    
-    const mediaContainer = document.getElementById('mod-media-container');
+function renderModeratorMedia(clue, mediaContainer) {
     mediaContainer.innerHTML = ''; 
     
     if (clue.type === 'image' && clue.url) {
@@ -220,11 +219,40 @@ function displayClueDetailsMod(col, row, clue, isDailyDouble) {
         mediaContainer.appendChild(vid);
     }
     else if (clue.type === 'audio' && clue.url) {
-        const aud = document.createElement('audio');
-        aud.src = clue.url;
-        aud.controls = true;
-        aud.style.width = "100%";
-        mediaContainer.appendChild(aud);
+        const urls = clue.url.split(',').map(u => u.trim());
+        
+        urls.forEach((url, idx) => {
+            const wrapper = document.createElement('div');
+            wrapper.style.marginBottom = "15px";
+            wrapper.style.padding = "10px";
+            wrapper.style.background = "#2a2a2a";
+            wrapper.style.borderRadius = "8px";
+
+            const aud = document.createElement('audio');
+            aud.src = url;
+            aud.controls = true;
+            aud.style.width = "100%";
+            aud.style.marginBottom = "10px";
+            
+            const broadcastBtn = document.createElement('button');
+            broadcastBtn.textContent = `🔊 Broadcast Audio ${urls.length > 1 ? idx + 1 : ''} to Players`;
+            broadcastBtn.style.backgroundColor = "var(--jeopardy-blue)";
+            broadcastBtn.style.width = "100%";
+            
+            broadcastBtn.onclick = () => {
+                gameChannel.postMessage({ type: 'PLAY_AUDIO_REMOTE', url: url });
+                broadcastBtn.textContent = "🔊 Broadcasting...";
+                broadcastBtn.style.backgroundColor = "var(--accent-green)";
+                setTimeout(() => {
+                    broadcastBtn.textContent = `🔊 Broadcast Audio ${urls.length > 1 ? idx + 1 : ''} to Players`;
+                    broadcastBtn.style.backgroundColor = "var(--jeopardy-blue)";
+                }, 2000);
+            };
+
+            wrapper.appendChild(aud);
+            wrapper.appendChild(broadcastBtn);
+            mediaContainer.appendChild(wrapper);
+        });
     }
     else if (clue.type === 'spotify' && clue.url) {
         let trackId = clue.url.includes("track/") ? clue.url.split('track/')[1].split('?')[0] : "";
@@ -250,6 +278,23 @@ function displayClueDetailsMod(col, row, clue, isDailyDouble) {
     }
 }
 
+function displayClueDetailsMod(col, row, clue, isDailyDouble) {
+    const categoryTitle = document.getElementById('current-category');
+    activeClueId = `clue-${col}-${row}`;
+
+    if (isDailyDouble) {
+        categoryTitle.innerHTML = `${gameData.categories[col].name} - 🚨 [DAILY DOUBLE] 🚨`;
+        currentClueValue = 0; // Wager logic takes over automatically
+    } else {
+        categoryTitle.textContent = `${gameData.categories[col].name} - ${clue.points}`;
+        currentClueValue = parseInt(clue.points, 10) || 0;
+    }
+
+    document.getElementById('mod-prompt-text').textContent = clue.prompt + (clue.url ? ` (${clue.type.toUpperCase()})` : '');
+    document.getElementById('mod-response-text').textContent = clue.response;
+    renderModeratorMedia(clue, document.getElementById('mod-media-container'));
+}
+
 function resetModPanelUI() {
     document.getElementById('current-category').textContent = 'Category - Point Value';
     document.getElementById('mod-prompt-text').textContent = 'Select a question from the board on the left.';
@@ -258,6 +303,11 @@ function resetModPanelUI() {
     activeClueId = null;
     currentClueValue = 0; 
     if (timerInterval) clearInterval(timerInterval);
+    
+    // Purge wagers across the board visually
+    teamWagers = {};
+    document.querySelectorAll('.wager-display').forEach(el => el.textContent = '');
+    
     buzzerOrder = [];
     renderBuzzerList();
 }
@@ -291,7 +341,6 @@ document.getElementById('btn-close-clue').addEventListener('click', () => {
     resetModPanelUI();
 });
 
-// Teams Synchronization
 function syncModeratorScoresUI(teamsData) {
     const teamContainer = document.getElementById('team-scores');
     document.querySelectorAll('.team').forEach(el => el.remove());
@@ -299,9 +348,15 @@ function syncModeratorScoresUI(teamsData) {
     teamsData.forEach((team, index) => {
         const newTeam = document.createElement('div');
         newTeam.className = 'team';
+        
+        const displayWager = teamWagers[team.name] !== undefined ? `(W: ${teamWagers[team.name]})` : '';
+        
         newTeam.innerHTML = `
             <input type="text" value="${team.name}">
             <div class="score-controls">
+                <span class="wager-display" style="color: var(--neon-yellow); font-size: 0.9rem; margin-right: 10px; font-weight: bold;">${displayWager}</span>
+                <button class="btn-clear-wager" title="Clear Wager" style="background-color: #555; color: white; border: 1px solid var(--border-color); padding: 4px 10px; margin-right: 5px;">🚫</button>
+                <button class="btn-wager" title="Request Wager" style="background-color: var(--neon-yellow); color: #121212; padding: 4px 10px; margin-right: 5px;">💰</button>
                 <button class="minus">-</button>
                 <span class="score">${team.score}</span>
                 <button class="plus">+</button>
@@ -321,17 +376,23 @@ function attachTeamListeners(teamDiv) {
     const nameInput = teamDiv.querySelector('input');
     const removeBtn = teamDiv.querySelector('.remove-team'); 
     const bonusBtn = teamDiv.querySelector('.bonus-plus'); 
+    const wagerBtn = teamDiv.querySelector('.btn-wager');
+    const clearWagerBtn = teamDiv.querySelector('.btn-clear-wager');
 
     plusBtn.addEventListener('click', () => {
+        let teamName = nameInput.value;
+        let amount = (teamWagers[teamName] !== undefined) ? teamWagers[teamName] : currentClueValue;
         let score = parseInt(scoreDisplay.textContent, 10) || 0;
-        score += currentClueValue;
+        score += amount;
         scoreDisplay.textContent = score;
         broadcastScores();
     });
 
     minusBtn.addEventListener('click', () => {
+        let teamName = nameInput.value;
+        let amount = (teamWagers[teamName] !== undefined) ? teamWagers[teamName] : currentClueValue;
         let score = parseInt(scoreDisplay.textContent, 10) || 0;
-        score -= currentClueValue;
+        score -= amount;
         scoreDisplay.textContent = score;
         broadcastScores();
     });
@@ -343,6 +404,23 @@ function attachTeamListeners(teamDiv) {
             score += bonusScore;
             scoreDisplay.textContent = score;
             broadcastScores();
+        });
+    }
+
+    if (wagerBtn) {
+        wagerBtn.addEventListener('click', () => {
+            gameChannel.postMessage({ type: 'REQUEST_WAGER', team: nameInput.value });
+            wagerBtn.textContent = '⏳';
+            setTimeout(() => wagerBtn.textContent = '💰', 2000);
+        });
+    }
+
+    if (clearWagerBtn) {
+        clearWagerBtn.addEventListener('click', () => {
+            let teamName = nameInput.value;
+            delete teamWagers[teamName];
+            teamDiv.querySelector('.wager-display').textContent = '';
+            gameChannel.postMessage({ type: 'CLEAR_WAGER', team: teamName });
         });
     }
 
@@ -368,6 +446,9 @@ document.getElementById('btn-add-team').addEventListener('click', () => {
     newTeam.innerHTML = `
         <input type="text" value="Team ${teamCount}">
         <div class="score-controls">
+            <span class="wager-display" style="color: var(--neon-yellow); font-size: 0.9rem; margin-right: 10px; font-weight: bold;"></span>
+            <button class="btn-clear-wager" title="Clear Wager" style="background-color: #555; color: white; border: 1px solid var(--border-color); padding: 4px 10px; margin-right: 5px;">🚫</button>
+            <button class="btn-wager" title="Request Wager" style="background-color: var(--neon-yellow); color: #121212; padding: 4px 10px; margin-right: 5px;">💰</button>
             <button class="minus">-</button>
             <span class="score">0</span>
             <button class="plus">+</button>
@@ -388,11 +469,9 @@ function broadcastScores() {
     gameChannel.postMessage({ type: 'UPDATE_SCORES', teams: teams });
 }
 
-// --- FORCE SYNC LOGIC ---
 document.getElementById('btn-force-sync').addEventListener('click', () => {
     gameChannel.postMessage({ type: 'FORCE_SYNC' });
     
-    // Give visual feedback to the moderator
     const btn = document.getElementById('btn-force-sync');
     const originalText = btn.textContent;
     btn.textContent = "Synced!";
@@ -414,27 +493,28 @@ document.getElementById('btn-reset-game').addEventListener('click', () => {
     resetModPanelUI();
 });
 
-// --- FINAL JEOPARDY LOGIC ---
 document.getElementById('btn-fj-category').addEventListener('click', () => {
-    const cat = document.getElementById('fj-category').value || 'Final Jeopardy';
+    const cat = gameData.finalJeopardy?.category || 'Final Jeopardy';
     gameChannel.postMessage({ type: 'SHOW_FJ_CATEGORY', category: cat });
 });
 
 document.getElementById('btn-fj-prompt').addEventListener('click', () => {
-    const prompt = document.getElementById('fj-prompt').value || '...';
-    gameChannel.postMessage({ type: 'SHOW_FJ_PROMPT', prompt: prompt });
+    const fj = gameData.finalJeopardy;
+    if (!fj) return;
+    
+    gameChannel.postMessage({ 
+        type: 'SHOW_FJ_PROMPT', 
+        prompt: fj.prompt || '...',
+        mediaType: fj.type || 'text',
+        mediaUrl: fj.url || null
+    });
 });
 
 document.getElementById('btn-fj-answer').addEventListener('click', () => {
-    const answer = document.getElementById('fj-answer').value || '...';
+    const answer = gameData.finalJeopardy?.answer || '...';
     gameChannel.postMessage({ type: 'SHOW_FJ_ANSWER', answer: answer });
 });
 
-document.getElementById('fj-wager-input').addEventListener('input', (e) => {
-    currentClueValue = parseInt(e.target.value, 10) || 0;
-});
-
-// --- TIMER LOGIC ---
 const modTimerDisplay = document.getElementById('mod-timer-display');
 const timerInput = document.getElementById('timer-input');
 
@@ -467,7 +547,6 @@ document.getElementById('btn-reset-timer').addEventListener('click', () => {
     gameChannel.postMessage({ type: 'HIDE_TIMER' }); 
 });
 
-// --- BUZZER LOGIC ---
 function renderBuzzerList() {
     const list = document.getElementById('buzzer-list');
     list.innerHTML = '';
@@ -499,5 +578,12 @@ document.getElementById('btn-next-buzzer').addEventListener('click', () => {
         buzzerOrder.shift(); 
         renderBuzzerList(); 
         gameChannel.postMessage({ type: 'BUZZER_ORDER', order: buzzerOrder });
+    }
+});
+
+// NEW: Reset Claims Logic
+document.getElementById('btn-reset-claims').addEventListener('click', () => {
+    if (confirm("Force all buzzed-in players back to the setup screen to pick their teams again?")) {
+        gameChannel.postMessage({ type: 'RESET_CLAIMS' });
     }
 });

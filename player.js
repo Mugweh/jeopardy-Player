@@ -38,7 +38,6 @@ gameChannel.onmessage = (event) => {
 
         // Restore active overlays dynamically
         if (state.activeOverlay) {
-            // Trick the client into playing the event back as if it just happened
             gameChannel.onmessage({ data: state.activeOverlay });
         }
     }
@@ -70,51 +69,18 @@ gameChannel.onmessage = (event) => {
         const overlay = document.getElementById('active-clue-overlay');
         const textContainer = document.getElementById('clue-text');
         
-        const existingMedia = document.getElementById('media-container');
-        if (existingMedia) existingMedia.remove();
-
-        if (message.mediaType === 'image' && message.mediaUrl) {
-            const urls = message.mediaUrl.split(',').map(u => u.trim());
-            const gallery = document.createElement('div');
-            gallery.id = 'media-container'; 
-            gallery.className = urls.length > 1 ? 'media-gallery' : '';
-            
-            urls.forEach(url => {
-                const img = document.createElement('img');
-                img.src = url;
-                img.className = urls.length > 1 ? 'clue-image-multi' : 'clue-image';
-                gallery.appendChild(img);
-            });
-            
-            overlay.insertBefore(gallery, textContainer);
-            textContainer.textContent = message.prompt;
-        } 
-        else if (message.mediaType === 'video' && message.mediaUrl) {
-            const vid = document.createElement('video');
-            vid.src = message.mediaUrl;
-            vid.autoplay = true;
-            vid.className = 'clue-video';
-            vid.id = 'media-container'; 
-            overlay.insertBefore(vid, textContainer);
-            textContainer.textContent = message.prompt;
-        }
-        else if (message.mediaType === 'audio' && message.mediaUrl) {
-            const aud = document.createElement('audio');
-            aud.src = message.mediaUrl;
-            aud.autoplay = true;
-            aud.id = 'media-container';
-            aud.style.display = 'none'; 
-            overlay.insertBefore(aud, textContainer);
-            textContainer.innerHTML = "🎧 <em>Listening to Audio Clue...</em><br><br>" + message.prompt;
-        }
-        else if (message.mediaType === 'youtube' || message.mediaType === 'spotify') {
-            textContainer.innerHTML = "🎧 <em>Listening to Audio Clue...</em><br><br>" + message.prompt;
-        }
-        else {
-            textContainer.innerHTML = message.prompt.replace(/\n/g, '<br>'); 
-        }
-
+        renderPlayerMedia(message, textContainer, overlay);
         overlay.classList.add('show-overlay');
+    }
+    else if (message.type === 'PLAY_AUDIO_REMOTE') {
+        const aud = document.createElement('audio');
+        aud.src = message.url;
+        aud.autoplay = true;
+        aud.className = 'remote-audio';
+        aud.style.display = 'none'; // Keep it hidden
+        
+        const overlay = document.getElementById('active-clue-overlay');
+        if (overlay) overlay.appendChild(aud);
     }
     else if (message.type === 'SHOW_ANSWER') {
         document.getElementById('clue-text').textContent = message.answer;
@@ -125,6 +91,11 @@ gameChannel.onmessage = (event) => {
         
         const existingMedia = document.getElementById('media-container');
         if (existingMedia) existingMedia.remove();
+        
+        document.querySelectorAll('.remote-audio').forEach(a => {
+            a.pause();
+            a.remove();
+        });
     }
     else if (message.type === 'UPDATE_SCORES') {
         updatePlayerScoresUI(message.teams);
@@ -146,7 +117,8 @@ gameChannel.onmessage = (event) => {
         const overlay = document.getElementById('active-clue-overlay');
         const textContainer = document.getElementById('clue-text');
         
-        textContainer.innerHTML = message.prompt.replace(/\n/g, '<br>');
+        // Pass FJ Data directly into the standard media renderer
+        renderPlayerMedia(message, textContainer, overlay);
         overlay.classList.add('show-overlay');
     }
     else if (message.type === 'SHOW_FJ_ANSWER') {
@@ -177,6 +149,11 @@ gameChannel.onmessage = (event) => {
         document.getElementById('active-clue-overlay').classList.remove('show-overlay');
         const existingMedia = document.getElementById('media-container');
         if (existingMedia) existingMedia.remove();
+        
+        document.querySelectorAll('.remote-audio').forEach(a => {
+            a.pause();
+            a.remove();
+        });
     }
 };
 
@@ -203,7 +180,47 @@ function buildPlayerBoard(data) {
     }
 }
 
-// Extracted Helper for Score Updating to keep things DRY
+// Extracted UI Logic for rendering both Standard and Final Jeopardy Media
+function renderPlayerMedia(message, textContainer, overlay) {
+    const existingMedia = document.getElementById('media-container');
+    if (existingMedia) existingMedia.remove();
+
+    if (message.mediaType === 'image' && message.mediaUrl) {
+        const urls = message.mediaUrl.split(',').map(u => u.trim());
+        const gallery = document.createElement('div');
+        gallery.id = 'media-container'; 
+        gallery.className = urls.length > 1 ? 'media-gallery' : '';
+        
+        urls.forEach(url => {
+            const img = document.createElement('img');
+            img.src = url;
+            img.className = urls.length > 1 ? 'clue-image-multi' : 'clue-image';
+            gallery.appendChild(img);
+        });
+        
+        overlay.insertBefore(gallery, textContainer);
+        textContainer.textContent = message.prompt;
+    } 
+    else if (message.mediaType === 'video' && message.mediaUrl) {
+        const vid = document.createElement('video');
+        vid.src = message.mediaUrl;
+        vid.autoplay = true;
+        vid.className = 'clue-video';
+        vid.id = 'media-container'; 
+        overlay.insertBefore(vid, textContainer);
+        textContainer.textContent = message.prompt;
+    }
+    else if (message.mediaType === 'audio' && message.mediaUrl) {
+        textContainer.innerHTML = "🎧 <em>Waiting for Host to start audio...</em><br><br>" + message.prompt;
+    }
+    else if (message.mediaType === 'youtube' || message.mediaType === 'spotify') {
+        textContainer.innerHTML = "🎧 <em>Listening to Audio Clue...</em><br><br>" + message.prompt;
+    }
+    else {
+        textContainer.innerHTML = message.prompt.replace(/\n/g, '<br>'); 
+    }
+}
+
 function updatePlayerScoresUI(teams) {
     const scoreBoard = document.getElementById('score-board');
     

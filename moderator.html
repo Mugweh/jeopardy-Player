@@ -48,21 +48,24 @@
 
             <div class="panel-section" id="final-jeopardy-controls">
                 <h2 style="color: var(--neon-yellow);">Final Jeopardy</h2>
-                <div style="display: flex; flex-direction: column; gap: 12px; margin-top: 15px;">
-                    <input type="text" id="fj-category" placeholder="Enter Category" style="padding: 10px; background: #1a1a1a; color: white; border: 1px solid var(--border-color); border-radius: 6px;">
-                    <textarea id="fj-prompt" placeholder="Enter Question" rows="3" style="padding: 10px; background: #1a1a1a; color: white; border: 1px solid var(--border-color); border-radius: 6px; font-family: 'Inter', sans-serif;"></textarea>
-                    <textarea id="fj-answer" placeholder="Enter Answer" rows="2" style="padding: 10px; background: #1a1a1a; color: white; border: 1px solid var(--border-color); border-radius: 6px; font-family: 'Inter', sans-serif;"></textarea>
+                
+                <div class="prompt-box">
+                    <strong>Category:</strong>
+                    <p id="mod-fj-category-text" style="color: var(--neon-yellow); font-weight: bold;">...</p>
+                    <strong>Prompt:</strong>
+                    <p id="mod-fj-prompt-text">Load a game to see Final Jeopardy.</p>
+                    <div id="mod-fj-media-container" style="margin-top: 15px;"></div>
+                </div>
+                
+                <div class="response-box">
+                    <strong>Response:</strong>
+                    <p id="mod-fj-answer-text">...</p>
+                </div>
 
-                    <div style="display: flex; align-items: center; gap: 10px; margin-top: 5px;">
-                        <label style="font-size: 0.9rem; color: var(--text-secondary); font-weight: bold;">Manual Wager Override:</label>
-                        <input type="number" id="fj-wager-input" placeholder="0" style="padding: 6px; font-size: 1rem; background: #1a1a1a; color: white; border: 1px solid var(--neon-yellow); border-radius: 4px; width: 100px;">
-                    </div>
-
-                    <div class="action-buttons">
-                        <button id="btn-fj-category" style="background-color: var(--jeopardy-blue);">1. Show Category (Wager Time)</button>
-                        <button id="btn-fj-prompt" style="background-color: var(--accent-blue);">2. Show Question</button>
-                        <button id="btn-fj-answer" style="background-color: var(--accent-green);">3. Reveal Answer</button>
-                    </div>
+                <div class="action-buttons" style="margin-top: 15px;">
+                    <button id="btn-fj-category" style="background-color: var(--jeopardy-blue);">1. Show Category (Wager Time)</button>
+                    <button id="btn-fj-prompt" style="background-color: var(--accent-blue);">2. Show Question</button>
+                    <button id="btn-fj-answer" style="background-color: var(--accent-green);">3. Reveal Answer</button>
                 </div>
             </div>
 
@@ -90,6 +93,7 @@
                 <div class="action-buttons">
                     <button id="btn-next-buzzer" style="background-color: var(--neon-yellow); color: var(--bg-dark);">Next in Queue (Dismiss #1)</button>
                     <button id="btn-clear-buzzers" style="background-color: var(--accent-red);">Clear Buzzers & Re-Enable</button>
+                    <button id="btn-reset-claims" style="background-color: #8b5cf6;">Reset Team Selection (Unclaim All)</button>
                 </div>
             </div>
 
@@ -104,6 +108,9 @@
                 <div class="team">
                     <input type="text" value="Team 1">
                     <div class="score-controls">
+                        <span class="wager-display" style="color: var(--neon-yellow); font-size: 0.9rem; margin-right: 10px; font-weight: bold;"></span>
+                        <button class="btn-clear-wager" title="Clear Wager" style="background-color: #555; color: white; border: 1px solid var(--border-color); padding: 4px 10px; margin-right: 5px;">🚫</button>
+                        <button class="btn-wager" title="Request Wager" style="background-color: var(--neon-yellow); color: #121212; padding: 4px 10px; margin-right: 5px;">💰</button>
                         <button class="minus">-</button>
                         <span class="score">0</span>
                         <button class="plus">+</button>
@@ -115,6 +122,9 @@
                 <div class="team">
                     <input type="text" value="Team 2">
                     <div class="score-controls">
+                        <span class="wager-display" style="color: var(--neon-yellow); font-size: 0.9rem; margin-right: 10px; font-weight: bold;"></span>
+                        <button class="btn-clear-wager" title="Clear Wager" style="background-color: #555; color: white; border: 1px solid var(--border-color); padding: 4px 10px; margin-right: 5px;">🚫</button>
+                        <button class="btn-wager" title="Request Wager" style="background-color: var(--neon-yellow); color: #121212; padding: 4px 10px; margin-right: 5px;">💰</button>
                         <button class="minus">-</button>
                         <span class="score">0</span>
                         <button class="plus">+</button>
@@ -126,6 +136,9 @@
                 <div class="team">
                     <input type="text" value="Team 3">
                     <div class="score-controls">
+                        <span class="wager-display" style="color: var(--neon-yellow); font-size: 0.9rem; margin-right: 10px; font-weight: bold;"></span>
+                        <button class="btn-clear-wager" title="Clear Wager" style="background-color: #555; color: white; border: 1px solid var(--border-color); padding: 4px 10px; margin-right: 5px;">🚫</button>
+                        <button class="btn-wager" title="Request Wager" style="background-color: var(--neon-yellow); color: #121212; padding: 4px 10px; margin-right: 5px;">💰</button>
                         <button class="minus">-</button>
                         <span class="score">0</span>
                         <button class="plus">+</button>
