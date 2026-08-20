@@ -1,6 +1,7 @@
 // The core JSON structure that maps to your game engine
 let gameData = {
     gameTitle: "New Jeopardy Game",
+    finalJeopardy: { category: "", type: "text", url: "", prompt: "", answer: "" },
     categories: []
 };
 
@@ -95,18 +96,16 @@ document.getElementById('btn-save-clue').addEventListener('click', () => {
     const { col, row } = activeEdit;
     if (col === null || row === null) return;
 
-    // Update internal gameData
     const clue = gameData.categories[col].clues[row];
     clue.type = document.getElementById('clue-type').value;
     clue.url = document.getElementById('clue-url').value;
     clue.prompt = document.getElementById('clue-prompt').value;
     clue.response = document.getElementById('clue-response').value;
 
-    // Hide text-only url values to keep JSON clean
     if (clue.type === 'text') clue.url = "";
 
     modal.classList.add('hidden');
-    renderBoard(); // Re-render to update the visual "filled" state
+    renderBoard(); 
 });
 
 // --- IMPORT & EXPORT LOGIC ---
@@ -132,6 +131,7 @@ document.getElementById('import-file').addEventListener('change', (event) => {
             const parsedData = JSON.parse(e.target.result);
             if (parsedData.categories && parsedData.categories.length === 5) {
                 gameData = parsedData;
+                if (!gameData.finalJeopardy) gameData.finalJeopardy = { category: "", type: "text", url: "", prompt: "", answer: "" };
                 renderBoard();
             } else {
                 alert("Invalid format! Must have exactly 5 categories.");
@@ -141,6 +141,54 @@ document.getElementById('import-file').addEventListener('change', (event) => {
         }
     };
     reader.readAsText(file);
+});
+
+// --- NEW LOGIC: Point Multiplier ---
+document.getElementById('btn-apply-multiplier').addEventListener('click', () => {
+    const baseVal = parseInt(document.getElementById('point-multiplier').value, 10) || 100;
+    gameData.categories.forEach(cat => {
+        cat.clues.forEach((clue, index) => {
+            clue.points = (index + 1) * baseVal;
+        });
+    });
+    renderBoard();
+});
+
+// --- NEW LOGIC: Final Jeopardy Modal ---
+const fjModal = document.getElementById('fj-modal');
+const buildFjTypeSelect = document.getElementById('build-fj-type');
+const buildFjUrlContainer = document.getElementById('build-fj-url-container');
+
+buildFjTypeSelect.addEventListener('change', (e) => {
+    buildFjUrlContainer.className = (e.target.value === 'text') ? 'hidden' : '';
+});
+
+document.getElementById('btn-edit-fj').addEventListener('click', () => {
+    const fj = gameData.finalJeopardy;
+    document.getElementById('build-fj-category').value = fj.category || '';
+    document.getElementById('build-fj-type').value = fj.type || 'text';
+    document.getElementById('build-fj-url').value = fj.url || '';
+    document.getElementById('build-fj-prompt').value = fj.prompt || '';
+    document.getElementById('build-fj-answer').value = fj.answer || '';
+    
+    buildFjUrlContainer.className = (fj.type === 'text' || !fj.type) ? 'hidden' : '';
+    fjModal.classList.remove('hidden');
+});
+
+document.getElementById('btn-cancel-fj').addEventListener('click', () => {
+    fjModal.classList.add('hidden');
+});
+
+document.getElementById('btn-save-fj').addEventListener('click', () => {
+    const t = document.getElementById('build-fj-type').value;
+    gameData.finalJeopardy = {
+        category: document.getElementById('build-fj-category').value,
+        type: t,
+        url: t === 'text' ? "" : document.getElementById('build-fj-url').value,
+        prompt: document.getElementById('build-fj-prompt').value,
+        answer: document.getElementById('build-fj-answer').value
+    };
+    fjModal.classList.add('hidden');
 });
 
 // Start the app

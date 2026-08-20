@@ -9,12 +9,20 @@
 <body>
     <div id="setup-screen">
         <h1>Join Game</h1>
-        <input type="text" id="team-name" placeholder="Enter your Team Name" value="Team 1">
+        <select id="team-select">
+            <option value="">Loading teams...</option>
+        </select>
         <button id="btn-join">Ready to Play</button>
     </div>
 
     <div id="buzzer-screen" class="hidden waiting">
         <div id="buzzer-status">WAITING FOR QUESTION...</div>
+    </div>
+
+    <div id="wager-screen" class="hidden waiting">
+        <h2>Enter Wager</h2>
+        <input type="number" id="wager-input" placeholder="0">
+        <button id="btn-submit-wager">Submit Wager</button>
     </div>
 
     <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>

@@ -19,7 +19,9 @@ server_state = {
     ],
     'answeredClues': [],
     'buzzerOrder': [],
-    'activeOverlay': None
+    'activeOverlay': None,
+    'claimedTeams': [],
+    'teamWagers': {}
 }
 
 def load_state():
@@ -27,7 +29,12 @@ def load_state():
     if os.path.exists(SAVE_FILE):
         try:
             with open(SAVE_FILE, 'r') as f:
-                server_state = json.load(f)
+                saved = json.load(f)
+                # Ensure new state keys exist for legacy save files
+                for key in server_state:
+                    if key not in saved:
+                        saved[key] = server_state[key]
+                server_state = saved
                 print("Game state loaded from disk.")
         except Exception as e:
             print("Error loading state from disk:", e)
@@ -52,7 +59,6 @@ def serve_static(path):
 
 @socketio.on('connect')
 def handle_connect():
-    # Send the remembered state to anyone who connects/refreshes instantly
     emit('game_event', {'type': 'SYNC_FULL_STATE', 'state': server_state})
 
 @socketio.on('game_event')
@@ -61,12 +67,10 @@ def handle_game_event(data):
     msg_type = data.get('type')
     state_changed = False
 
-    # Force a sync broadcast to all players manually
     if msg_type == 'FORCE_SYNC':
         emit('game_event', {'type': 'SYNC_FULL_STATE', 'state': server_state}, broadcast=True, include_self=False)
         return
 
-    # Intercept and update server memory before broadcasting
     if msg_type == 'LOAD_GAME':
         server_state['gameData'] = data.get('data')
         server_state['answeredClues'] = []
@@ -75,6 +79,26 @@ def handle_game_event(data):
         state_changed = True
     elif msg_type == 'UPDATE_SCORES':
         server_state['teams'] = data.get('teams', server_state['teams'])
+        state_changed = True
+    elif msg_type == 'CLAIM_TEAM':
+        team = data.get('team')
+        if team and team not in server_state['claimedTeams']:
+            server_state['claimedTeams'].append(team)
+        state_changed = True
+        data = {'type': 'UPDATE_CLAIMS', 'claimedTeams': server_state['claimedTeams']}
+    elif msg_type == 'RESET_CLAIMS':
+        server_state['claimedTeams'] = []
+        state_changed = True
+        data = {'type': 'UPDATE_CLAIMS', 'claimedTeams': []}
+    elif msg_type == 'SUBMIT_WAGER':
+        team = data.get('team')
+        if team:
+            server_state['teamWagers'][team] = int(data.get('wager', 0))
+        state_changed = True
+    elif msg_type == 'CLEAR_WAGER':
+        team = data.get('team')
+        if team and team in server_state['teamWagers']:
+            del server_state['teamWagers'][team]
         state_changed = True
     elif msg_type in ['SHOW_PROMPT', 'SHOW_DAILY_DOUBLE', 'SHOW_FJ_CATEGORY', 'SHOW_FJ_PROMPT']:
         server_state['activeOverlay'] = data
@@ -85,32 +109,27 @@ def handle_game_event(data):
     elif msg_type == 'SHOW_ANSWER' or msg_type == 'SHOW_FJ_ANSWER':
         server_state['activeOverlay'] = data
         state_changed = True
-    elif msg_type == 'CLOSE_CLUE':
-        server_state['activeOverlay'] = None
-        server_state['buzzerOrder'] = []
-        state_changed = True
     elif msg_type == 'BUZZER_ORDER':
         server_state['buzzerOrder'] = data.get('order', [])
         state_changed = True
-    elif msg_type == 'RESET_GAME':
-        server_state['answeredClues'] = []
-        server_state['buzzerOrder'] = []
+    elif msg_type == 'CLOSE_CLUE' or msg_type == 'RESET_GAME':
         server_state['activeOverlay'] = None
-        for team in server_state['teams']:
-            team['score'] = 0
+        server_state['buzzerOrder'] = []
+        server_state['teamWagers'] = {}
+        if msg_type == 'RESET_GAME':
+            server_state['answeredClues'] = []
+            for team in server_state['teams']:
+                team['score'] = 0
         state_changed = True
 
-    # Save to disk if any core data was updated
     if state_changed:
         save_state()
 
-    # Broadcast to everyone else
     emit('game_event', data, broadcast=True, include_self=False)
 
 if __name__ == '__main__':
     print("=========================================")
-    print("Trivia Server Running!")
+    print("Trivia Server Running! (Wager Update)")
     print("Host locally at: http://localhost:5000")
-    print("Ensure Tailscale is connected for remote players.")
     print("=========================================")
     socketio.run(app, host='0.0.0.0', port=5000)
