@@ -55,6 +55,9 @@ gameChannel.onmessage = (event) => {
         
         const existingMedia = document.getElementById('media-container');
         if (existingMedia) existingMedia.remove();
+        
+        const existingWrapper = document.getElementById('all-media-wrapper');
+        if (existingWrapper) existingWrapper.remove();
 
         textContainer.innerHTML = "<div style='font-size: 8vw; color: var(--neon-yellow); text-transform: uppercase; font-weight: 900; letter-spacing: 5px; text-shadow: 0 0 30px rgba(255, 204, 0, 0.8), 5px 5px 10px rgba(0,0,0,1);'>Daily Double</div>";
 
@@ -82,8 +85,83 @@ gameChannel.onmessage = (event) => {
         const overlay = document.getElementById('active-clue-overlay');
         if (overlay) overlay.appendChild(aud);
     }
-    else if (message.type === 'SHOW_ANSWER') {
-        document.getElementById('clue-text').textContent = message.answer;
+    else if (message.type === 'SHOW_ANSWER' || message.type === 'SHOW_FJ_ANSWER') {
+        const textContainer = document.getElementById('clue-text');
+        const answerText = message.answer ? message.answer.replace(/\n/g, '<br>') : '...';
+        
+        const answerHtml = `<div style="color: #10b981; font-size: 3.5vw; text-shadow: 0 0 15px rgba(16, 185, 129, 0.5); margin-top: 15px;">${answerText}</div>`;
+        
+        // Prevent duplicate answers if host clicks twice
+        if (!textContainer.innerHTML.includes(answerText)) {
+            textContainer.innerHTML += answerHtml;
+        }
+
+        // Handle Side-by-Side Answer Media
+        if (message.responseType && message.responseType !== 'text' && message.responseUrl) {
+            const overlay = document.getElementById('active-clue-overlay');
+            let mediaWrapper = document.getElementById('all-media-wrapper');
+            
+            if (!mediaWrapper) {
+                mediaWrapper = document.createElement('div');
+                mediaWrapper.id = 'all-media-wrapper';
+                mediaWrapper.style.display = 'flex';
+                mediaWrapper.style.gap = '20px';
+                mediaWrapper.style.justifyContent = 'center';
+                mediaWrapper.style.alignItems = 'center';
+                mediaWrapper.style.flexWrap = 'wrap';
+                mediaWrapper.style.marginBottom = '15px';
+                mediaWrapper.style.width = '100%';
+                
+                const existingMedia = document.getElementById('media-container');
+                if (existingMedia) {
+                    overlay.insertBefore(mediaWrapper, existingMedia);
+                    mediaWrapper.appendChild(existingMedia);
+                    existingMedia.style.marginBottom = '0';
+                    existingMedia.style.flex = '0 1 auto';
+                } else {
+                    overlay.insertBefore(mediaWrapper, textContainer);
+                }
+            }
+            
+            const respContainer = document.createElement('div');
+            respContainer.id = 'response-media-container';
+            respContainer.style.flex = '0 1 auto';
+            respContainer.style.display = 'flex';
+            respContainer.style.justifyContent = 'center';
+            respContainer.style.alignItems = 'center';
+            respContainer.style.gap = '20px';
+            
+            if (message.responseType === 'image') {
+                const urls = message.responseUrl.split(',').map(u => u.trim());
+                urls.forEach(url => {
+                    const img = document.createElement('img');
+                    img.src = url;
+                    img.className = 'clue-image-multi';
+                    img.style.border = '4px solid #10b981';
+                    img.style.boxShadow = '0 0 20px rgba(16, 185, 129, 0.6)';
+                    respContainer.appendChild(img);
+                });
+            } else if (message.responseType === 'video') {
+                const vid = document.createElement('video');
+                vid.src = message.responseUrl;
+                vid.autoplay = true;
+                vid.controls = true;
+                vid.className = 'clue-video';
+                vid.style.maxWidth = '40vw';
+                vid.style.border = '4px solid #10b981';
+                vid.style.boxShadow = '0 0 20px rgba(16, 185, 129, 0.6)';
+                respContainer.appendChild(vid);
+            }
+            
+            mediaWrapper.appendChild(respContainer);
+            
+            // Shrink any existing question media so it fits seamlessly alongside the answer
+            const existingImgs = mediaWrapper.querySelectorAll('.clue-image');
+            existingImgs.forEach(img => img.className = 'clue-image-multi');
+            
+            const existingVids = mediaWrapper.querySelectorAll('.clue-video:not([src="'+message.responseUrl+'"])');
+            existingVids.forEach(vid => vid.style.maxWidth = '40vw');
+        }
     } 
     else if (message.type === 'CLOSE_CLUE') {
         const overlay = document.getElementById('active-clue-overlay');
@@ -91,6 +169,9 @@ gameChannel.onmessage = (event) => {
         
         const existingMedia = document.getElementById('media-container');
         if (existingMedia) existingMedia.remove();
+        
+        const existingWrapper = document.getElementById('all-media-wrapper');
+        if (existingWrapper) existingWrapper.remove();
         
         document.querySelectorAll('.remote-audio').forEach(a => {
             a.pause();
@@ -106,6 +187,9 @@ gameChannel.onmessage = (event) => {
         
         const existingMedia = document.getElementById('media-container');
         if (existingMedia) existingMedia.remove();
+        
+        const existingWrapper = document.getElementById('all-media-wrapper');
+        if (existingWrapper) existingWrapper.remove();
 
         textContainer.innerHTML = `
             <div style='font-size: 4vw; color: #b0b0b0; text-transform: uppercase; font-weight: 700; letter-spacing: 2px;'>Final Jeopardy Category</div>
@@ -120,11 +204,6 @@ gameChannel.onmessage = (event) => {
         // Pass FJ Data directly into the standard media renderer
         renderPlayerMedia(message, textContainer, overlay);
         overlay.classList.add('show-overlay');
-    }
-    else if (message.type === 'SHOW_FJ_ANSWER') {
-        const textContainer = document.getElementById('clue-text');
-        
-        textContainer.innerHTML += `<br><br><span style="color: #10b981; font-size: 4vw; text-shadow: 0 0 15px rgba(16, 185, 129, 0.5);">${message.answer.replace(/\n/g, '<br>')}</span>`;
     }
     else if (message.type === 'SYNC_TIMER') {
         const timerEl = document.getElementById('player-timer');
@@ -147,8 +226,12 @@ gameChannel.onmessage = (event) => {
     else if (message.type === 'RESET_GAME') {
         document.querySelectorAll('.cell.points').forEach(cell => cell.classList.remove('answered'));
         document.getElementById('active-clue-overlay').classList.remove('show-overlay');
+        
         const existingMedia = document.getElementById('media-container');
         if (existingMedia) existingMedia.remove();
+        
+        const existingWrapper = document.getElementById('all-media-wrapper');
+        if (existingWrapper) existingWrapper.remove();
         
         document.querySelectorAll('.remote-audio').forEach(a => {
             a.pause();
@@ -184,6 +267,9 @@ function buildPlayerBoard(data) {
 function renderPlayerMedia(message, textContainer, overlay) {
     const existingMedia = document.getElementById('media-container');
     if (existingMedia) existingMedia.remove();
+    
+    const existingWrapper = document.getElementById('all-media-wrapper');
+    if (existingWrapper) existingWrapper.remove();
 
     if (message.mediaType === 'image' && message.mediaUrl) {
         const urls = message.mediaUrl.split(',').map(u => u.trim());

@@ -21,7 +21,7 @@ let dailyDoubleId = null;
 let timerInterval = null; 
 let timerSeconds = 30;
 let buzzerOrder = []; 
-let teamWagers = {}; // NEW: Stores dynamically submitted wagers
+let teamWagers = {}; 
 
 document.getElementById('game-file').addEventListener('change', handleFileUpload);
 
@@ -120,6 +120,7 @@ function handleFileUpload(event) {
                 document.getElementById('mod-fj-answer-text').textContent = gameData.finalJeopardy.answer || '...';
                 
                 renderModeratorMedia(gameData.finalJeopardy, document.getElementById('mod-fj-media-container'));
+                renderModeratorMedia({type: gameData.finalJeopardy.responseType || 'text', url: gameData.finalJeopardy.responseUrl || ''}, document.getElementById('mod-fj-response-media-container'));
             }
 
             const randomCol = Math.floor(Math.random() * gameData.categories.length);
@@ -195,6 +196,7 @@ function buildModeratorBoard(data) {
 }
 
 function renderModeratorMedia(clue, mediaContainer) {
+    if (!clue || !clue.type) return;
     mediaContainer.innerHTML = ''; 
     
     if (clue.type === 'image' && clue.url) {
@@ -284,7 +286,7 @@ function displayClueDetailsMod(col, row, clue, isDailyDouble) {
 
     if (isDailyDouble) {
         categoryTitle.innerHTML = `${gameData.categories[col].name} - 🚨 [DAILY DOUBLE] 🚨`;
-        currentClueValue = 0; // Wager logic takes over automatically
+        currentClueValue = 0; 
     } else {
         categoryTitle.textContent = `${gameData.categories[col].name} - ${clue.points}`;
         currentClueValue = parseInt(clue.points, 10) || 0;
@@ -292,7 +294,9 @@ function displayClueDetailsMod(col, row, clue, isDailyDouble) {
 
     document.getElementById('mod-prompt-text').textContent = clue.prompt + (clue.url ? ` (${clue.type.toUpperCase()})` : '');
     document.getElementById('mod-response-text').textContent = clue.response;
+    
     renderModeratorMedia(clue, document.getElementById('mod-media-container'));
+    renderModeratorMedia({type: clue.responseType || 'text', url: clue.responseUrl || ''}, document.getElementById('mod-response-media-container'));
 }
 
 function resetModPanelUI() {
@@ -300,11 +304,12 @@ function resetModPanelUI() {
     document.getElementById('mod-prompt-text').textContent = 'Select a question from the board on the left.';
     document.getElementById('mod-response-text').textContent = '...';
     document.getElementById('mod-media-container').innerHTML = '';
+    document.getElementById('mod-response-media-container').innerHTML = '';
+    document.getElementById('mod-fj-response-media-container').innerHTML = '';
     activeClueId = null;
     currentClueValue = 0; 
     if (timerInterval) clearInterval(timerInterval);
     
-    // Purge wagers across the board visually
     teamWagers = {};
     document.querySelectorAll('.wager-display').forEach(el => el.textContent = '');
     
@@ -330,8 +335,20 @@ document.getElementById('btn-show-prompt').addEventListener('click', () => {
 });
 
 document.getElementById('btn-show-answer').addEventListener('click', () => {
-    const responseText = document.getElementById('mod-response-text').textContent;
-    gameChannel.postMessage({ type: 'SHOW_ANSWER', answer: responseText });
+    if (!activeClueId) return;
+    const parts = activeClueId.split('-');
+    if (parts.length === 3) {
+        const col = parts[1];
+        const row = parts[2];
+        const clue = gameData.categories[col].clues[row];
+
+        gameChannel.postMessage({ 
+            type: 'SHOW_ANSWER', 
+            answer: clue.response,
+            responseType: clue.responseType || 'text',
+            responseUrl: clue.responseUrl || ''
+        });
+    }
 });
 
 document.getElementById('btn-close-clue').addEventListener('click', () => {
@@ -511,8 +528,13 @@ document.getElementById('btn-fj-prompt').addEventListener('click', () => {
 });
 
 document.getElementById('btn-fj-answer').addEventListener('click', () => {
-    const answer = gameData.finalJeopardy?.answer || '...';
-    gameChannel.postMessage({ type: 'SHOW_FJ_ANSWER', answer: answer });
+    const fj = gameData.finalJeopardy;
+    gameChannel.postMessage({ 
+        type: 'SHOW_FJ_ANSWER', 
+        answer: fj?.answer || '...',
+        responseType: fj?.responseType || 'text',
+        responseUrl: fj?.responseUrl || ''
+    });
 });
 
 const modTimerDisplay = document.getElementById('mod-timer-display');
@@ -581,7 +603,6 @@ document.getElementById('btn-next-buzzer').addEventListener('click', () => {
     }
 });
 
-// NEW: Reset Claims Logic
 document.getElementById('btn-reset-claims').addEventListener('click', () => {
     if (confirm("Force all buzzed-in players back to the setup screen to pick their teams again?")) {
         gameChannel.postMessage({ type: 'RESET_CLAIMS' });
