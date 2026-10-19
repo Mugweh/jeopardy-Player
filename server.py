@@ -90,6 +90,12 @@ def handle_game_event(data):
         server_state['claimedTeams'] = []
         state_changed = True
         data = {'type': 'UPDATE_CLAIMS', 'claimedTeams': []}
+    elif msg_type == 'UNCLAIM_TEAM':
+        team = data.get('team')
+        if team and team in server_state['claimedTeams']:
+            server_state['claimedTeams'].remove(team)
+        state_changed = True
+        data = {'type': 'UPDATE_CLAIMS', 'claimedTeams': server_state['claimedTeams']}
     elif msg_type == 'SUBMIT_WAGER':
         team = data.get('team')
         if team:

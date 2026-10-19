@@ -351,7 +351,6 @@ document.getElementById('btn-show-answer').addEventListener('click', () => {
     }
 });
 
-// NEW: Emits a toggle zoom event for the current screen's images
 document.getElementById('btn-toggle-zoom').addEventListener('click', () => {
     gameChannel.postMessage({ type: 'TOGGLE_ZOOM' });
 });
@@ -381,6 +380,7 @@ function syncModeratorScoresUI(teamsData) {
             <input type="text" value="${team.name}">
             <div class="score-controls">
                 <span class="wager-display" style="color: var(--neon-yellow); font-size: 0.9rem; margin-right: 10px; font-weight: bold;">${displayWager}</span>
+                <button class="btn-unclaim-team" title="Unclaim Team / Force Rejoin" style="background-color: #8b5cf6; color: white; border: none; padding: 4px 10px; margin-right: 5px;">🔓</button>
                 <button class="btn-clear-wager" title="Clear Wager" style="background-color: #555; color: white; border: 1px solid var(--border-color); padding: 4px 10px; margin-right: 5px;">🚫</button>
                 <button class="btn-wager" title="Request Wager" style="background-color: var(--neon-yellow); color: #121212; padding: 4px 10px; margin-right: 5px;">💰</button>
                 <button class="minus">-</button>
@@ -404,6 +404,7 @@ function attachTeamListeners(teamDiv) {
     const bonusBtn = teamDiv.querySelector('.bonus-plus'); 
     const wagerBtn = teamDiv.querySelector('.btn-wager');
     const clearWagerBtn = teamDiv.querySelector('.btn-clear-wager');
+    const unclaimBtn = teamDiv.querySelector('.btn-unclaim-team'); // NEW
 
     plusBtn.addEventListener('click', () => {
         let teamName = nameInput.value;
@@ -450,6 +451,15 @@ function attachTeamListeners(teamDiv) {
         });
     }
 
+    if (unclaimBtn) {
+        unclaimBtn.addEventListener('click', () => {
+            let teamName = nameInput.value;
+            if (confirm(`Force player on "${teamName}" to unclaim and rejoin?`)) {
+                gameChannel.postMessage({ type: 'UNCLAIM_TEAM', team: teamName });
+            }
+        });
+    }
+
     nameInput.addEventListener('input', () => broadcastScores());
 
     if (removeBtn) {
@@ -473,6 +483,7 @@ document.getElementById('btn-add-team').addEventListener('click', () => {
         <input type="text" value="Team ${teamCount}">
         <div class="score-controls">
             <span class="wager-display" style="color: var(--neon-yellow); font-size: 0.9rem; margin-right: 10px; font-weight: bold;"></span>
+            <button class="btn-unclaim-team" title="Unclaim Team / Force Rejoin" style="background-color: #8b5cf6; color: white; border: none; padding: 4px 10px; margin-right: 5px;">🔓</button>
             <button class="btn-clear-wager" title="Clear Wager" style="background-color: #555; color: white; border: 1px solid var(--border-color); padding: 4px 10px; margin-right: 5px;">🚫</button>
             <button class="btn-wager" title="Request Wager" style="background-color: var(--neon-yellow); color: #121212; padding: 4px 10px; margin-right: 5px;">💰</button>
             <button class="minus">-</button>
