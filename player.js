@@ -80,7 +80,7 @@ gameChannel.onmessage = (event) => {
         aud.src = message.url;
         aud.autoplay = true;
         aud.className = 'remote-audio';
-        aud.style.display = 'none'; // Keep it hidden
+        aud.style.display = 'none'; 
         
         const overlay = document.getElementById('active-clue-overlay');
         if (overlay) overlay.appendChild(aud);
@@ -91,7 +91,6 @@ gameChannel.onmessage = (event) => {
         
         const answerHtml = `<div style="color: #10b981; font-size: 3.5vw; text-shadow: 0 0 15px rgba(16, 185, 129, 0.5); margin-top: 15px;">${answerText}</div>`;
         
-        // Prevent duplicate answers if host clicks twice
         if (!textContainer.innerHTML.includes(answerText)) {
             textContainer.innerHTML += answerHtml;
         }
@@ -139,6 +138,11 @@ gameChannel.onmessage = (event) => {
                     img.className = 'clue-image-multi';
                     img.style.border = '4px solid #10b981';
                     img.style.boxShadow = '0 0 20px rgba(16, 185, 129, 0.6)';
+                    
+                    img.addEventListener('click', () => {
+                        img.classList.toggle('zoomed');
+                    });
+
                     respContainer.appendChild(img);
                 });
             } else if (message.responseType === 'video') {
@@ -155,7 +159,6 @@ gameChannel.onmessage = (event) => {
             
             mediaWrapper.appendChild(respContainer);
             
-            // Shrink any existing question media so it fits seamlessly alongside the answer
             const existingImgs = mediaWrapper.querySelectorAll('.clue-image');
             existingImgs.forEach(img => img.className = 'clue-image-multi');
             
@@ -163,6 +166,13 @@ gameChannel.onmessage = (event) => {
             existingVids.forEach(vid => vid.style.maxWidth = '40vw');
         }
     } 
+    // NEW: Toggles the zoom class on all displayed images when triggered by the moderator
+    else if (message.type === 'TOGGLE_ZOOM') {
+        const overlayImgs = document.querySelectorAll('#active-clue-overlay img');
+        overlayImgs.forEach(img => {
+            img.classList.toggle('zoomed');
+        });
+    }
     else if (message.type === 'CLOSE_CLUE') {
         const overlay = document.getElementById('active-clue-overlay');
         overlay.classList.remove('show-overlay');
@@ -201,7 +211,6 @@ gameChannel.onmessage = (event) => {
         const overlay = document.getElementById('active-clue-overlay');
         const textContainer = document.getElementById('clue-text');
         
-        // Pass FJ Data directly into the standard media renderer
         renderPlayerMedia(message, textContainer, overlay);
         overlay.classList.add('show-overlay');
     }
@@ -281,6 +290,11 @@ function renderPlayerMedia(message, textContainer, overlay) {
             const img = document.createElement('img');
             img.src = url;
             img.className = urls.length > 1 ? 'clue-image-multi' : 'clue-image';
+            
+            img.addEventListener('click', () => {
+                img.classList.toggle('zoomed');
+            });
+
             gallery.appendChild(img);
         });
         

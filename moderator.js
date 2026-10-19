@@ -351,6 +351,15 @@ document.getElementById('btn-show-answer').addEventListener('click', () => {
     }
 });
 
+// NEW: Emits a toggle zoom event for the current screen's images
+document.getElementById('btn-toggle-zoom').addEventListener('click', () => {
+    gameChannel.postMessage({ type: 'TOGGLE_ZOOM' });
+});
+
+document.getElementById('btn-fj-toggle-zoom').addEventListener('click', () => {
+    gameChannel.postMessage({ type: 'TOGGLE_ZOOM' });
+});
+
 document.getElementById('btn-close-clue').addEventListener('click', () => {
     gameChannel.postMessage({ type: 'CLOSE_CLUE' });
     gameChannel.postMessage({ type: 'HIDE_TIMER' });
