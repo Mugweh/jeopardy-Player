@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Anime Lyrics Game Builder</title>
+    <link rel="stylesheet" href="builder.css">
+</head>
+<body>
+    <header>
+        <div class="title-container">
+            <label>Lyrics Pack Title:</label>
+            <input type="text" id="game-title" value="Anime Lyrics Showdown">
+        </div>
+        <div class="controls">
+            <input type="file" id="import-file" accept=".json" style="display: none;">
+            <button id="btn-import" onclick="document.getElementById('import-file').click()">Load Existing</button>
+            <button id="btn-export">Export lyrics_game.json</button>
+        </div>
+    </header>
+
+    <main style="padding: 20px; display: flex; flex-direction: column; gap: 20px; overflow-y: auto;">
+        <div id="rounds-container" style="display: flex; flex-direction: column; gap: 20px;"></div>
+        <button id="btn-add-round" class="btn-primary" style="padding: 15px; font-size: 1.2rem;">+ Add New Round</button>
+    </main>
+
+    <script src="lyrics_builder.js"></script>
+</body>
+</html>
