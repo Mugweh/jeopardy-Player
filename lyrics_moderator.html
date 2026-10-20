@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lyrics Game - Moderator View</title>
+    <link rel="stylesheet" href="moderator.css">
+</head>
+<body>
+    <header>
+        <h1>Lyrics Moderator Dashboard</h1>
+        <div>
+            <input type="file" id="lyrics-file" accept=".json">
+            <button onclick="window.open('lyrics_player.html', '_blank')">Open Big Screen View</button>
+            <button onclick="window.open('lyrics_buzzer.html', '_blank')" style="background:#10b981;">Open Buzzer View</button>
+        </div>
+    </header>
+
+    <main>
+        <section id="mini-board-container" style="flex:1;">
+            <h2>Round Control</h2>
+            <div id="round-status" style="font-size: 1.5rem; color: var(--neon-yellow); margin-bottom: 15px;">No Game Loaded</div>
+            
+            <div class="prompt-box">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                    <strong>Current Lyric Snippet:</strong>
+                    <span id="snippet-tracker" style="color: var(--neon-yellow); font-weight: bold;">Snippet 1 of 1</span>
+                </div>
+                <p id="mod-lyrics-text" style="font-size: 1.2rem; line-height: 1.5;">Load a lyrics_game.json file to start.</p>
+                <div style="display: flex; gap: 10px; margin-top: 15px;">
+                    <button id="btn-prev-snippet" style="background: #444; flex: 1;">◀ Previous Snippet</button>
+                    <button id="btn-next-snippet" style="background: var(--accent-blue); flex: 1;">Next Snippet ▶</button>
+                </div>
+            </div>
+
+            <div class="response-box">
+                <strong>Correct Anime Answer:</strong>
+                <p id="mod-answer-text">...</p>
+            </div>
+
+            <div id="mod-hints-list" style="margin-top:10px;"></div>
+
+            <div class="action-buttons" style="margin-top: 20px;">
+                <button id="btn-reveal-hint" style="background-color: var(--neon-yellow); color: #121212; font-weight:bold;">💡 Increase Hint Counter (Reduces Round Value)</button>
+                <button id="btn-reveal-answer" style="background-color: var(--accent-green);">👁️ Reveal Answer on Screen</button>
+                <button id="btn-next-round" style="background-color: var(--jeopardy-blue);">➡️ Go to Next Round</button>
+                <button id="btn-reset-claims" style="background-color: #8b5cf6;">Reset All Team Selections</button>
+            </div>
+        </section>
+
+        <section id="control-panel" style="flex:1.2;">
+            <div class="panel-section">
+                <h2>Player Submissions (Current Round)</h2>
+                <div id="submissions-list" style="display:flex; flex-direction:column; gap:10px; margin-top:15px;">
+                    <em style="color:#666;">No submissions yet.</em>
+                </div>
+            </div>
+
+            <div class="panel-section">
+                <h2>Teams & Scoreboard (Lyrics Mode)</h2>
+                <div style="margin-bottom: 15px; display: flex; align-items: center; gap: 10px;">
+                    <label style="font-size: 0.9rem; color: var(--neon-yellow); font-weight: bold;">Manual Points:</label>
+                    <input type="number" id="manual-score-input" value="1" style="padding: 6px; font-size: 1rem; background: #1a1a1a; color: white; border: 1px solid var(--accent-blue); border-radius: 4px; width: 80px;">
+                </div>
+                <div id="mod-scores-list" style="display:flex; flex-direction:column; gap:10px;"></div>
+            </div>
+        </section>
+    </main>
+
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+    <script src="lyrics_moderator.js"></script>
+</body>
+</html>

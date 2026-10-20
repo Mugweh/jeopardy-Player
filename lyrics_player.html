@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lyrics Game - Big Screen</title>
+    <link rel="stylesheet" href="player.css">
+    <style>
+        #lyrics-container {
+            font-size: 2.2vw;
+            line-height: 1.6;
+            background: rgba(0, 0, 0, 0.6);
+            padding: 25px;
+            border-radius: 12px;
+            border: 2px solid rgba(255, 255, 255, 0.1);
+            max-width: 85vw;
+            text-align: center; /* Set to 'left' if stanzas look misaligned when centered */
+            margin-bottom: 20px;
+            white-space: pre-wrap;  /* Preserves \n line breaks, spaces, and tabs */
+            word-break: break-word; /* Prevents long words from overflowing */
+        }
+        .hint-badge {
+            background: rgba(255, 204, 0, 0.2);
+            border: 2px solid var(--neon-yellow);
+            color: var(--neon-yellow);
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-size: 1.5vw;
+            margin: 5px;
+        }
+        .locked-badge {
+            background: #060ce9;
+            color: white;
+            padding: 8px 15px;
+            border-radius: 20px;
+            font-size: 1.2vw;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+
+    <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; height:85vh; padding:20px; box-sizing:border-box;">
+        <div id="round-header" style="font-size: 3vw; color: var(--neon-yellow); font-weight: 900; margin-bottom: 10px;">ANIME LYRICS SHOWDOWN</div>
+        <div id="points-header" style="font-size: 2vw; color: #10b981; font-weight: bold; margin-bottom: 15px;">CURRENT ROUND VALUE: 4 POINTS</div>
+
+        <div id="lyrics-container">Waiting for host to start game...</div>
+
+        <div id="hints-display" style="display:flex; flex-direction:column; gap:10px; align-items:center; width:100%;"></div>
+
+        <div id="revealed-answer" style="display:none; font-size:3vw; color:#10b981; font-weight:900; margin-top:15px; text-shadow: 0 0 20px rgba(16,185,129,0.6);"></div>
+
+        <div id="locked-teams" style="display:flex; gap:10px; margin-top:20px; flex-wrap:wrap; justify-content:center;"></div>
+    </div>
+
+    <div id="score-board"></div>
+
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+    <script src="lyrics_player.js"></script>
+</body>
+</html>
