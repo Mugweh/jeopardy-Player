@@ -92,8 +92,8 @@ gameChannel.onmessage = (event) => {
         claimedTeams = msg.claimedTeams || [];
         renderTeamSelect();
         
-        // Kick back to setup if host resets claims
-        if (claimedTeams.length === 0 && myTeam !== "") {
+        // Kick back to setup if host resets all claims OR unclaims this specific team
+        if (myTeam !== "" && !claimedTeams.includes(myTeam)) {
             myTeam = "";
             document.getElementById('setup-screen').classList.remove('hidden');
             document.getElementById('buzzer-screen').classList.add('hidden');
@@ -105,7 +105,7 @@ gameChannel.onmessage = (event) => {
         if (msg.team === myTeam) {
             document.getElementById('buzzer-screen').classList.add('hidden');
             document.getElementById('wager-screen').classList.remove('hidden');
-            document.getElementById('wager-input').value = ''; // Clear previous
+            document.getElementById('wager-input').value = ''; 
         }
     }
     else if (msg.type === 'ENABLE_BUZZERS') {

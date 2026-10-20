@@ -191,8 +191,10 @@ main {
 /* Teams & Scores Section */
 .team {
     display: flex;
+    flex-wrap: wrap; /* Allows wrapping on small screens */
     justify-content: space-between;
     align-items: center;
+    gap: 10px;
     margin-bottom: 12px;
     padding: 12px;
     background: #1a1a1a;
@@ -208,7 +210,8 @@ main {
     border: none;
     border-bottom: 1px solid var(--border-color);
     padding: 5px;
-    width: 40%;
+    flex: 1; /* Automatically fills available space */
+    min-width: 120px; /* Prevents vanishing on shrink */
     transition: border-color 0.2s;
 }
 
@@ -219,8 +222,9 @@ main {
 
 .score-controls {
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
-    gap: 15px;
+    gap: 10px;
 }
 
 .score-controls .score {

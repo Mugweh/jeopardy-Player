@@ -42,7 +42,7 @@
             <label>Category:</label>
             <input type="text" id="build-fj-category" placeholder="Enter FJ Category...">
 
-            <label>Media Type:</label>
+            <label>Prompt Media Type:</label>
             <select id="build-fj-type">
                 <option value="text">Standard Text</option>
                 <option value="image">Image(s) (Comma-separate for multiple)</option>
@@ -53,7 +53,7 @@
             </select>
 
             <div id="build-fj-url-container" class="hidden">
-                <label>Media URL / Path:</label>
+                <label>Prompt Media URL / Path:</label>
                 <input type="text" id="build-fj-url" placeholder="e.g., https://youtu.be/... or images/pic.jpg">
             </div>
 
@@ -62,6 +62,18 @@
 
             <label>Response (The Answer):</label>
             <input type="text" id="build-fj-answer" placeholder="Enter the final answer...">
+
+            <label style="margin-top: 10px;">Response Media Type (Optional):</label>
+            <select id="build-fj-response-type">
+                <option value="text">None / Standard Text</option>
+                <option value="image">Image(s) (Comma-separate for multiple)</option>
+                <option value="video">Local Video (e.g., media/clip.mp4)</option>
+            </select>
+
+            <div id="build-fj-response-url-container" class="hidden">
+                <label>Response Media URL / Path:</label>
+                <input type="text" id="build-fj-response-url" placeholder="e.g., images/answer.jpg">
+            </div>
 
             <div class="modal-actions">
                 <button id="btn-cancel-fj" class="btn-secondary">Cancel</button>
@@ -75,7 +87,7 @@
         <div class="modal-content">
             <h2 id="modal-title">Edit Clue - 100 Points</h2>
             
-            <label>Media Type:</label>
+            <label>Prompt Media Type:</label>
             <select id="clue-type">
                 <option value="text">Standard Text</option>
                 <option value="image">Image(s) (Comma-separate for multiple)</option>
@@ -86,7 +98,7 @@
             </select>
 
             <div id="url-container" class="hidden">
-                <label>Media URL / Path:</label>
+                <label>Prompt Media URL / Path:</label>
                 <input type="text" id="clue-url" placeholder="e.g., https://youtu.be/... or images/pic.jpg">
             </div>
 
@@ -95,6 +107,18 @@
 
             <label>Response (The Answer):</label>
             <input type="text" id="clue-response" placeholder="Enter the correct answer...">
+
+            <label style="margin-top: 10px;">Response Media Type (Optional):</label>
+            <select id="clue-response-type">
+                <option value="text">None / Standard Text</option>
+                <option value="image">Image(s) (Comma-separate for multiple)</option>
+                <option value="video">Local Video (e.g., media/clip.mp4)</option>
+            </select>
+
+            <div id="response-url-container" class="hidden">
+                <label>Response Media URL / Path:</label>
+                <input type="text" id="clue-response-url" placeholder="e.g., images/answer.jpg">
+            </div>
 
             <div class="modal-actions">
                 <button id="btn-cancel" class="btn-secondary">Cancel</button>

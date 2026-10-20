@@ -1,11 +1,11 @@
 // The core JSON structure that maps to your game engine
 let gameData = {
     gameTitle: "New Jeopardy Game",
-    finalJeopardy: { category: "", type: "text", url: "", prompt: "", answer: "" },
+    finalJeopardy: { category: "", type: "text", url: "", prompt: "", answer: "", responseType: "text", responseUrl: "" },
     categories: []
 };
 
-let activeEdit = { col: null, row: null }; // Tracks which cell is open in the modal
+let activeEdit = { col: null, row: null };
 
 // Initialize an empty 5x5 board
 function initializeEmptyBoard() {
@@ -13,9 +13,11 @@ function initializeEmptyBoard() {
         name: `Category ${colIndex + 1}`,
         clues: Array.from({ length: 5 }, (_, rowIndex) => ({
             type: "text",
+            url: "",
             prompt: "",
             response: "",
-            url: "",
+            responseType: "text",
+            responseUrl: "",
             points: (rowIndex + 1) * 100
         }))
     }));
@@ -27,7 +29,6 @@ function renderBoard() {
     board.innerHTML = '';
     document.getElementById('game-title').value = gameData.gameTitle;
 
-    // 1. Render Category Headers
     gameData.categories.forEach((cat, col) => {
         const headerDiv = document.createElement('div');
         headerDiv.className = 'cell category-header';
@@ -43,14 +44,12 @@ function renderBoard() {
         board.appendChild(headerDiv);
     });
 
-    // 2. Render Clue Squares
     for (let row = 0; row < 5; row++) {
         for (let col = 0; col < 5; col++) {
             const clue = gameData.categories[col].clues[row];
             const clueDiv = document.createElement('div');
             clueDiv.className = 'cell clue-cell';
             
-            // Visual check: If it has a prompt AND response, mark it as filled
             if (clue.prompt.trim() !== "" && clue.response.trim() !== "") {
                 clueDiv.classList.add('filled');
             }
@@ -67,8 +66,15 @@ const modal = document.getElementById('clue-modal');
 const typeSelect = document.getElementById('clue-type');
 const urlContainer = document.getElementById('url-container');
 
+const respTypeSelect = document.getElementById('clue-response-type');
+const respUrlContainer = document.getElementById('response-url-container');
+
 typeSelect.addEventListener('change', (e) => {
     urlContainer.className = (e.target.value === 'text') ? 'hidden' : '';
+});
+
+respTypeSelect.addEventListener('change', (e) => {
+    respUrlContainer.className = (e.target.value === 'text') ? 'hidden' : '';
 });
 
 function openModal(col, row) {
@@ -80,9 +86,12 @@ function openModal(col, row) {
     document.getElementById('clue-url').value = clue.url || '';
     document.getElementById('clue-prompt').value = clue.prompt || '';
     document.getElementById('clue-response').value = clue.response || '';
+    
+    document.getElementById('clue-response-type').value = clue.responseType || 'text';
+    document.getElementById('clue-response-url').value = clue.responseUrl || '';
 
-    // Trigger URL box visibility
     urlContainer.className = (clue.type === 'text' || !clue.type) ? 'hidden' : '';
+    respUrlContainer.className = (clue.responseType === 'text' || !clue.responseType) ? 'hidden' : '';
     
     modal.classList.remove('hidden');
 }
@@ -101,8 +110,12 @@ document.getElementById('btn-save-clue').addEventListener('click', () => {
     clue.url = document.getElementById('clue-url').value;
     clue.prompt = document.getElementById('clue-prompt').value;
     clue.response = document.getElementById('clue-response').value;
+    
+    clue.responseType = document.getElementById('clue-response-type').value;
+    clue.responseUrl = document.getElementById('clue-response-url').value;
 
     if (clue.type === 'text') clue.url = "";
+    if (clue.responseType === 'text') clue.responseUrl = "";
 
     modal.classList.add('hidden');
     renderBoard(); 
@@ -131,7 +144,9 @@ document.getElementById('import-file').addEventListener('change', (event) => {
             const parsedData = JSON.parse(e.target.result);
             if (parsedData.categories && parsedData.categories.length === 5) {
                 gameData = parsedData;
-                if (!gameData.finalJeopardy) gameData.finalJeopardy = { category: "", type: "text", url: "", prompt: "", answer: "" };
+                if (!gameData.finalJeopardy) {
+                    gameData.finalJeopardy = { category: "", type: "text", url: "", prompt: "", answer: "", responseType: "text", responseUrl: "" };
+                }
                 renderBoard();
             } else {
                 alert("Invalid format! Must have exactly 5 categories.");
@@ -143,7 +158,6 @@ document.getElementById('import-file').addEventListener('change', (event) => {
     reader.readAsText(file);
 });
 
-// --- NEW LOGIC: Point Multiplier ---
 document.getElementById('btn-apply-multiplier').addEventListener('click', () => {
     const baseVal = parseInt(document.getElementById('point-multiplier').value, 10) || 100;
     gameData.categories.forEach(cat => {
@@ -159,8 +173,15 @@ const fjModal = document.getElementById('fj-modal');
 const buildFjTypeSelect = document.getElementById('build-fj-type');
 const buildFjUrlContainer = document.getElementById('build-fj-url-container');
 
+const buildFjRespTypeSelect = document.getElementById('build-fj-response-type');
+const buildFjRespUrlContainer = document.getElementById('build-fj-response-url-container');
+
 buildFjTypeSelect.addEventListener('change', (e) => {
     buildFjUrlContainer.className = (e.target.value === 'text') ? 'hidden' : '';
+});
+
+buildFjRespTypeSelect.addEventListener('change', (e) => {
+    buildFjRespUrlContainer.className = (e.target.value === 'text') ? 'hidden' : '';
 });
 
 document.getElementById('btn-edit-fj').addEventListener('click', () => {
@@ -171,7 +192,12 @@ document.getElementById('btn-edit-fj').addEventListener('click', () => {
     document.getElementById('build-fj-prompt').value = fj.prompt || '';
     document.getElementById('build-fj-answer').value = fj.answer || '';
     
+    document.getElementById('build-fj-response-type').value = fj.responseType || 'text';
+    document.getElementById('build-fj-response-url').value = fj.responseUrl || '';
+    
     buildFjUrlContainer.className = (fj.type === 'text' || !fj.type) ? 'hidden' : '';
+    buildFjRespUrlContainer.className = (fj.responseType === 'text' || !fj.responseType) ? 'hidden' : '';
+    
     fjModal.classList.remove('hidden');
 });
 
@@ -181,12 +207,16 @@ document.getElementById('btn-cancel-fj').addEventListener('click', () => {
 
 document.getElementById('btn-save-fj').addEventListener('click', () => {
     const t = document.getElementById('build-fj-type').value;
+    const rt = document.getElementById('build-fj-response-type').value;
+    
     gameData.finalJeopardy = {
         category: document.getElementById('build-fj-category').value,
         type: t,
         url: t === 'text' ? "" : document.getElementById('build-fj-url').value,
         prompt: document.getElementById('build-fj-prompt').value,
-        answer: document.getElementById('build-fj-answer').value
+        answer: document.getElementById('build-fj-answer').value,
+        responseType: rt,
+        responseUrl: rt === 'text' ? "" : document.getElementById('build-fj-response-url').value
     };
     fjModal.classList.add('hidden');
 });
