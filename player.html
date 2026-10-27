@@ -3,35 +3,24 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Anime Jeopardy - Player View</title>
+    <title>Trivia Night – Big Screen</title>
     <link rel="stylesheet" href="player.css">
 </head>
 <body>
 
     <div id="game-board"></div>
 
-    <div id="score-board">
-        <div class="player-team" id="display-team-0">
-            <div class="team-name">Team 1</div>
-            <div class="team-score">0</div>
-        </div>
-        <div class="player-team" id="display-team-1">
-            <div class="team-name">Team 2</div>
-            <div class="team-score">0</div>
-        </div>
-        <div class="player-team" id="display-team-2">
-            <div class="team-name">Team 3</div>
-            <div class="team-score">0</div>
-        </div>
-    </div>
+    <div id="score-board"></div>
 
     <div id="player-timer" class="hidden">30</div>
 
     <div id="active-clue-overlay">
-        <span id="clue-text">This is where the big question will appear!</span>
+        <span id="clue-text"></span>
+        <div id="answer-text"></div>
     </div>
 
     <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+    <script src="common.js"></script>
     <script src="player.js"></script>
 </body>
 </html>

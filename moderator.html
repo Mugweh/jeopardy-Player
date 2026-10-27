@@ -3,163 +3,208 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Anime Jeopardy - Moderator View</title>
+    <title>Moderator – Trivia Night</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap">
+    <link rel="stylesheet" href="ui.css">
     <link rel="stylesheet" href="moderator.css">
 </head>
 <body>
 
-    <header>
-        <h1>Moderator Dashboard</h1>
-        <div class="setup-controls">
-            <input type="file" id="game-file" accept=".json">
-            <button id="open-player-window" onclick="window.open('player.html', '_blank')">1. Open Big Screen</button>
-            <button id="btn-force-sync" style="background-color: var(--accent-blue); margin-left: 10px;">Force Sync Players</button>
-            <button id="btn-reset-game" style="background-color: #dc3545; margin-left: 10px;">Reset Game</button>
+<header class="app-header">
+    <div class="brand">
+        <div class="logo">J!</div>
+        <div>
+            <h1>Moderator</h1>
+            <div class="subtitle" id="game-title">No game loaded</div>
         </div>
-    </header>
+    </div>
+    <div class="toolbar">
+        <span id="conn-pill" class="pill"><span class="dot"></span>Connecting…</span>
+        <input type="file" id="game-file" accept=".json,application/json" hidden>
+        <label class="btn btn-primary" for="game-file" tabindex="0" id="btn-load">📂 Load game</label>
+        <button id="open-player-window" title="Open the audience screen in a new window">🖥 Big screen</button>
+        <button id="btn-copy-buzzer" title="Copy the link players open on their phones">📱 Copy phone link</button>
+        <button id="btn-force-sync" class="ghost" title="Re-send the current state to every screen">⟳ Sync</button>
+        <button id="btn-reset-game" class="ghost" title="Clear the board and zero all scores">↺ Reset game</button>
+    </div>
+</header>
 
-    <main>
-        <section id="mini-board-container">
-            <h2>Game Board</h2>
-            <div id="mini-board"></div>
-        </section>
+<main class="layout">
 
-        <section id="control-panel">
-            <div class="panel-section" id="active-clue-details">
-                <h2 id="current-category">Category - Point Value</h2>
-                
+    <!-- ===================== BOARD ===================== -->
+    <section class="board-col">
+        <div class="card board-card">
+            <div class="card-head">
+                <span class="card-title">Game board</span>
+                <span id="progress" class="pill">0 / 0 played</span>
+            </div>
+
+            <div class="dd-bar" id="dd-bar">
+                <span class="dd-label">⭐ Daily Double</span>
+                <div class="segmented" id="dd-mode" role="group" aria-label="Daily Double selection">
+                    <button data-mode="random" title="Pick a random unplayed tile">🎲 Random</button>
+                    <button data-mode="manual" title="Choose the tile yourself">✋ Choose tile</button>
+                    <button data-mode="none" title="Play without a Daily Double">None</button>
+                </div>
+                <span id="dd-status" class="dd-status"></span>
+            </div>
+            <div id="dd-banner" class="banner" hidden>
+                <strong>Choose the Daily Double:</strong> click any unplayed tile on the board.
+                <button class="sm ghost" id="btn-dd-cancel">Cancel <kbd>Esc</kbd></button>
+            </div>
+
+            <div id="mini-board" aria-label="Game board"></div>
+
+            <div id="empty-state" class="empty-state">
+                <div class="big">🎯</div>
+                <h2>No game loaded</h2>
+                <p>Load a <code>game.json</code> from the Builder, or drag &amp; drop it anywhere on this page.</p>
+                <label class="btn btn-primary" for="game-file">📂 Choose game file</label>
+            </div>
+        </div>
+    </section>
+
+    <!-- ===================== CONTROLS ===================== -->
+    <section class="side-col">
+
+        <div class="card" id="main-card">
+            <div class="tabs" role="tablist">
+                <button class="active" data-tab="clue" role="tab">Clue</button>
+                <button data-tab="final" role="tab">Final Jeopardy</button>
+            </div>
+
+            <!-- Current clue -->
+            <div id="tab-clue" class="tab-body">
+                <div class="clue-head">
+                    <h2 id="current-category">No clue selected</h2>
+                    <span id="clue-value" class="value-badge" hidden></span>
+                </div>
+
+                <div id="dd-alert" class="banner dd" hidden>
+                    <div><strong>⭐ DAILY DOUBLE!</strong> Ask the team for a wager, then show the prompt.</div>
+                    <div class="wager-buttons" id="dd-wager-buttons"></div>
+                </div>
+
                 <div class="prompt-box">
-                    <strong>Prompt (What the Audience Sees):</strong>
-                    <p id="mod-prompt-text">Select a question from the board on the left.</p>
-                    <div id="mod-media-container" style="margin-top: 15px;"></div>
+                    <div class="box-label">Prompt <span>— what the audience sees</span></div>
+                    <p id="mod-prompt-text" class="placeholder">Click a tile on the board to begin.</p>
+                    <div id="mod-media-container" class="media"></div>
                 </div>
-                
+
                 <div class="response-box">
-                    <strong>Response (The Correct Answer):</strong>
-                    <p id="mod-response-text">...</p>
-                    <div id="mod-response-media-container" style="margin-top: 15px;"></div>
+                    <div class="box-label">Response <span>— moderator only</span></div>
+                    <p id="mod-response-text" class="placeholder">…</p>
+                    <div id="mod-response-media-container" class="media"></div>
                 </div>
-                
-                <div class="action-buttons">
-                    <button id="btn-show-prompt">2. Show Prompt on Big Screen</button>
-                    <button id="btn-show-answer">3. Reveal Answer on Big Screen</button>
-                    <button id="btn-toggle-zoom" style="background-color: #8b5cf6;">🔍 Toggle Image Zoom on Big Screen</button>
-                    <button id="btn-close-clue">4. Close Question & Return to Board</button>
+
+                <div class="steps" id="clue-steps">
+                    <span data-step="1">1 Select</span><span data-step="2">2 Prompt</span><span data-step="3">3 Answer</span><span data-step="4">4 Close</span>
+                </div>
+
+                <button id="btn-primary-action" class="btn-primary big-action" disabled>Select a tile to start</button>
+
+                <div class="button-row">
+                    <button id="btn-show-prompt" disabled>Show prompt <kbd>P</kbd></button>
+                    <button id="btn-show-answer" disabled>Reveal answer <kbd>A</kbd></button>
+                    <button id="btn-toggle-zoom" class="purple" disabled title="Enlarge / shrink images on the big screen">🔍 Zoom <kbd>Z</kbd></button>
+                    <button id="btn-close-clue" class="danger" disabled>Close clue <kbd>C</kbd></button>
                 </div>
             </div>
 
-            <div class="panel-section" id="final-jeopardy-controls">
-                <h2 style="color: var(--neon-yellow);">Final Jeopardy</h2>
-                
+            <!-- Final Jeopardy -->
+            <div id="tab-final" class="tab-body" hidden>
+                <div class="clue-head"><h2 class="gold">Final Jeopardy</h2></div>
+
                 <div class="prompt-box">
-                    <strong>Category:</strong>
-                    <p id="mod-fj-category-text" style="color: var(--neon-yellow); font-weight: bold;">...</p>
-                    <strong>Prompt:</strong>
-                    <p id="mod-fj-prompt-text">Load a game to see Final Jeopardy.</p>
-                    <div id="mod-fj-media-container" style="margin-top: 15px;"></div>
+                    <div class="box-label">Category</div>
+                    <p id="mod-fj-category-text" class="fj-cat placeholder">…</p>
+                    <div class="box-label" style="margin-top:.8rem">Prompt</div>
+                    <p id="mod-fj-prompt-text" class="placeholder">Load a game to see Final Jeopardy.</p>
+                    <div id="mod-fj-media-container" class="media"></div>
                 </div>
-                
+
                 <div class="response-box">
-                    <strong>Response:</strong>
-                    <p id="mod-fj-answer-text">...</p>
-                    <div id="mod-fj-response-media-container" style="margin-top: 15px;"></div>
+                    <div class="box-label">Response <span>— moderator only</span></div>
+                    <p id="mod-fj-answer-text" class="placeholder">…</p>
+                    <div id="mod-fj-response-media-container" class="media"></div>
                 </div>
 
-                <div class="action-buttons" style="margin-top: 15px;">
-                    <button id="btn-fj-category" style="background-color: var(--jeopardy-blue);">1. Show Category (Wager Time)</button>
-                    <button id="btn-fj-prompt" style="background-color: var(--accent-blue);">2. Show Question</button>
-                    <button id="btn-fj-answer" style="background-color: var(--accent-green);">3. Reveal Answer</button>
-                    <button id="btn-fj-toggle-zoom" style="background-color: #8b5cf6;">🔍 Toggle Image Zoom on Big Screen</button>
+                <button id="btn-fj-wagers" class="warn btn-block" style="margin-top:.9rem">💰 Ask every team for a wager</button>
+
+                <div class="fj-steps">
+                    <button id="btn-fj-category" class="primary"><b>1</b> Show category</button>
+                    <button id="btn-fj-prompt" class="primary"><b>2</b> Show question</button>
+                    <button id="btn-fj-answer" class="success"><b>3</b> Reveal answer</button>
+                    <button id="btn-fj-close" class="danger"><b>4</b> Close</button>
+                </div>
+                <button id="btn-fj-toggle-zoom" class="purple btn-block" style="margin-top:.6rem">🔍 Zoom images on big screen</button>
+            </div>
+        </div>
+
+        <div class="two-col">
+            <!-- Timer -->
+            <div class="card" id="timer-controls">
+                <div class="card-head"><span class="card-title">Timer</span>
+                    <div class="presets" id="timer-presets">
+                        <button class="sm ghost" data-secs="10">10</button>
+                        <button class="sm ghost" data-secs="15">15</button>
+                        <button class="sm ghost" data-secs="30">30</button>
+                        <button class="sm ghost" data-secs="60">60</button>
+                    </div>
+                </div>
+                <div class="timer-row">
+                    <div id="mod-timer-display" class="timer-display">30</div>
+                    <div class="timer-input"><input type="number" id="timer-input" value="30" min="1" max="999" aria-label="Seconds"><span>sec</span></div>
+                </div>
+                <div class="button-row tight">
+                    <button id="btn-start-timer" class="success">▶ Start <kbd>T</kbd></button>
+                    <button id="btn-stop-timer" class="warn">⏸ Pause</button>
+                    <button id="btn-reset-timer" class="ghost">Reset</button>
                 </div>
             </div>
 
-            <div class="panel-section" id="timer-controls">
-                <h2>Countdown Timer</h2>
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 15px;">
-                    <div style="display: flex; gap: 10px; align-items: center;">
-                        <input type="number" id="timer-input" value="30" style="width: 60px; padding: 6px; background: #1a1a1a; color: white; border: 1px solid var(--border-color); border-radius: 4px; font-size: 1rem;">
-                        <span style="color: var(--text-secondary); font-weight: bold;">Secs</span>
-                    </div>
-                    <div id="mod-timer-display" style="font-size: 2rem; color: var(--neon-yellow); font-weight: 900;">30</div>
+            <!-- Buzzers -->
+            <div class="card" id="buzzer-controls">
+                <div class="card-head"><span class="card-title">Buzzer order</span>
+                    <span id="buzzer-state" class="pill">Locked</span>
                 </div>
-                <div class="action-buttons" style="flex-direction: row; margin-top: 15px; display: flex; gap: 10px;">
-                    <button id="btn-start-timer" style="background-color: var(--accent-green); flex: 1;">Start</button>
-                    <button id="btn-stop-timer" style="background-color: var(--accent-red); flex: 1;">Stop</button>
-                    <button id="btn-reset-timer" style="background-color: #555; flex: 1;">Reset</button>
+                <ol id="buzzer-list" class="buzzer-list"><li class="empty">No buzzes yet.</li></ol>
+                <div class="judge-row" id="judge-row" hidden>
+                    <button id="btn-judge-correct" class="success">✓ Correct</button>
+                    <button id="btn-judge-wrong" class="danger">✗ Wrong</button>
                 </div>
-            </div>
-
-            <div class="panel-section" id="buzzer-controls">
-                <h2>Buzzer Order</h2>
-                <ul id="buzzer-list" style="list-style: none; padding: 0; margin: 15px 0; font-size: 1.2rem; min-height: 50px; background: #1a1a1a; border-radius: 6px; padding: 10px;">
-                    <li style="color: #666; font-style: italic;">No buzzes yet.</li>
-                </ul>
-                <div class="action-buttons">
-                    <button id="btn-next-buzzer" style="background-color: var(--neon-yellow); color: var(--bg-dark);">Next in Queue (Dismiss #1)</button>
-                    <button id="btn-clear-buzzers" style="background-color: var(--accent-red);">Clear Buzzers & Re-Enable</button>
-                    <button id="btn-reset-claims" style="background-color: #8b5cf6;">Reset Team Selection (Unclaim All)</button>
+                <div class="button-row tight">
+                    <button id="btn-next-buzzer" class="warn sm" title="Remove the first team from the queue">Skip #1</button>
+                    <button id="btn-clear-buzzers" class="sm">🔄 Re-open</button>
+                    <button id="btn-lock-buzzers" class="ghost sm">🔒 Lock</button>
                 </div>
             </div>
+        </div>
 
-            <div class="panel-section" id="team-scores">
-                <h2>Teams & Scores</h2>
-                
-                <div style="margin-bottom: 15px; display: flex; align-items: center; gap: 10px;">
-                    <label style="font-size: 0.9rem; color: var(--neon-yellow); font-weight: bold;">Bonus Points:</label>
-                    <input type="number" id="bonus-input" placeholder="0" style="padding: 6px; font-size: 1rem; background: #1a1a1a; color: white; border: 1px solid var(--accent-blue); border-radius: 4px; width: 80px;">
+        <!-- Teams -->
+        <div class="card" id="team-scores">
+            <div class="card-head">
+                <span class="card-title">Teams &amp; scores</span>
+                <div class="toolbar tight">
+                    <label class="bonus-field" title="Points added by the +B button">
+                        <span>Bonus</span>
+                        <input type="number" id="bonus-input" placeholder="0">
+                    </label>
+                    <button id="btn-reset-claims" class="ghost sm" title="Send every phone back to the team-selection screen">📱 Reset picks</button>
                 </div>
-
-                <div class="team">
-                    <input type="text" value="Team 1">
-                    <div class="score-controls">
-                        <span class="wager-display" style="color: var(--neon-yellow); font-size: 0.9rem; margin-right: 10px; font-weight: bold;"></span>
-                        <button class="btn-unclaim-team" title="Unclaim Team / Force Rejoin" style="background-color: #8b5cf6; color: white; border: none; padding: 4px 10px; margin-right: 5px;">🔓</button>
-                        <button class="btn-clear-wager" title="Clear Wager" style="background-color: #555; color: white; border: 1px solid var(--border-color); padding: 4px 10px; margin-right: 5px;">🚫</button>
-                        <button class="btn-wager" title="Request Wager" style="background-color: var(--neon-yellow); color: #121212; padding: 4px 10px; margin-right: 5px;">💰</button>
-                        <button class="minus">-</button>
-                        <span class="score">0</span>
-                        <button class="plus">+</button>
-                        <button class="bonus-plus" title="Add Bonus">+B</button>
-                        <button class="remove-team" title="Remove Team">✖</button>
-                    </div>
-                </div>
-
-                <div class="team">
-                    <input type="text" value="Team 2">
-                    <div class="score-controls">
-                        <span class="wager-display" style="color: var(--neon-yellow); font-size: 0.9rem; margin-right: 10px; font-weight: bold;"></span>
-                        <button class="btn-unclaim-team" title="Unclaim Team / Force Rejoin" style="background-color: #8b5cf6; color: white; border: none; padding: 4px 10px; margin-right: 5px;">🔓</button>
-                        <button class="btn-clear-wager" title="Clear Wager" style="background-color: #555; color: white; border: 1px solid var(--border-color); padding: 4px 10px; margin-right: 5px;">🚫</button>
-                        <button class="btn-wager" title="Request Wager" style="background-color: var(--neon-yellow); color: #121212; padding: 4px 10px; margin-right: 5px;">💰</button>
-                        <button class="minus">-</button>
-                        <span class="score">0</span>
-                        <button class="plus">+</button>
-                        <button class="bonus-plus" title="Add Bonus">+B</button>
-                        <button class="remove-team" title="Remove Team">✖</button>
-                    </div>
-                </div>
-                
-                <div class="team">
-                    <input type="text" value="Team 3">
-                    <div class="score-controls">
-                        <span class="wager-display" style="color: var(--neon-yellow); font-size: 0.9rem; margin-right: 10px; font-weight: bold;"></span>
-                        <button class="btn-unclaim-team" title="Unclaim Team / Force Rejoin" style="background-color: #8b5cf6; color: white; border: none; padding: 4px 10px; margin-right: 5px;">🔓</button>
-                        <button class="btn-clear-wager" title="Clear Wager" style="background-color: #555; color: white; border: 1px solid var(--border-color); padding: 4px 10px; margin-right: 5px;">🚫</button>
-                        <button class="btn-wager" title="Request Wager" style="background-color: var(--neon-yellow); color: #121212; padding: 4px 10px; margin-right: 5px;">💰</button>
-                        <button class="minus">-</button>
-                        <span class="score">0</span>
-                        <button class="plus">+</button>
-                        <button class="bonus-plus" title="Add Bonus">+B</button>
-                        <button class="remove-team" title="Remove Team">✖</button>
-                    </div>
-                </div>
-
-                <button id="btn-add-team" style="width: 100%; margin-top: 15px; background-color: #28a745;">+ Add New Team</button>
             </div>
-        </section>
-    </main>
+            <div id="team-list"></div>
+            <button id="btn-add-team" class="btn-block ghost">＋ Add team</button>
+            <p class="hint">Tip: rename teams <em>before</em> players join on their phones. Scores are editable — click a number to type a new one.</p>
+        </div>
+    </section>
+</main>
 
-    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
-    <script src="moderator.js"></script>
+<div id="drop-overlay" hidden><div>Drop <b>game.json</b> to load it</div></div>
+
+<script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+<script src="common.js"></script>
+<script src="moderator.js"></script>
 </body>
 </html>

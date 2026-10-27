@@ -1,349 +1,242 @@
-// Connect to the Python WebSocket Server
+'use strict';
+/* Big screen (audience view). Purely reactive: it renders whatever the
+   moderator sends, and restores everything from the server on (re)connect. */
+
+const { safeHtml, normalizeGame, gameRows, clueId, splitUrls } = Common;
 const socket = io();
 
-const gameChannel = {
-    postMessage: (data) => {
-        socket.emit('game_event', data);
-    }
-};
+const $id = id => document.getElementById(id);
+const overlay = $id('active-clue-overlay');
+const clueText = $id('clue-text');
+const answerText = $id('answer-text');
 
-socket.on('game_event', (data) => {
-    if (typeof gameChannel.onmessage === 'function') {
-        gameChannel.onmessage({ data: data });
-    }
-});
+socket.on('game_event', handleMessage);
 
-// --- GAME LOGIC ---
-
-gameChannel.onmessage = (event) => {
-    const message = event.data;
-
-    if (message.type === 'SYNC_FULL_STATE') {
-        const state = message.state;
-
-        // Restore Board Data
-        if (state.gameData) {
-            buildPlayerBoard(state.gameData);
-            // Re-grey out clues already answered
-            state.answeredClues.forEach(clueId => {
-                const cell = document.getElementById(clueId);
-                if (cell) cell.classList.add('answered');
-            });
-        }
-        
-        // Restore Scores
-        if (state.teams) {
-            updatePlayerScoresUI(state.teams);
-        }
-
-        // Restore active overlays dynamically
-        if (state.activeOverlay) {
-            gameChannel.onmessage({ data: state.activeOverlay });
-        }
-    }
-    else if (message.type === 'LOAD_GAME') {
-        buildPlayerBoard(message.data);
-    } 
-    else if (message.type === 'SHOW_DAILY_DOUBLE') {
-        if (message.clueId) {
-             const gridCell = document.getElementById(message.clueId);
-             if (gridCell) gridCell.classList.add('answered');
-        }
-        
-        const overlay = document.getElementById('active-clue-overlay');
-        const textContainer = document.getElementById('clue-text');
-        
-        const existingMedia = document.getElementById('media-container');
-        if (existingMedia) existingMedia.remove();
-        
-        const existingWrapper = document.getElementById('all-media-wrapper');
-        if (existingWrapper) existingWrapper.remove();
-
-        textContainer.innerHTML = "<div style='font-size: 8vw; color: var(--neon-yellow); text-transform: uppercase; font-weight: 900; letter-spacing: 5px; text-shadow: 0 0 30px rgba(255, 204, 0, 0.8), 5px 5px 10px rgba(0,0,0,1);'>Daily Double</div>";
-
-        overlay.classList.add('show-overlay');
-    }
-    else if (message.type === 'SHOW_PROMPT') {
-        if (message.clueId) {
-             const gridCell = document.getElementById(message.clueId);
-             if (gridCell) gridCell.classList.add('answered');
-        }
-        
-        const overlay = document.getElementById('active-clue-overlay');
-        const textContainer = document.getElementById('clue-text');
-        
-        renderPlayerMedia(message, textContainer, overlay);
-        overlay.classList.add('show-overlay');
-    }
-    else if (message.type === 'PLAY_AUDIO_REMOTE') {
-        const aud = document.createElement('audio');
-        aud.src = message.url;
-        aud.autoplay = true;
-        aud.className = 'remote-audio';
-        aud.style.display = 'none'; 
-        
-        const overlay = document.getElementById('active-clue-overlay');
-        if (overlay) overlay.appendChild(aud);
-    }
-    else if (message.type === 'SHOW_ANSWER' || message.type === 'SHOW_FJ_ANSWER') {
-        const textContainer = document.getElementById('clue-text');
-        const answerText = message.answer ? message.answer.replace(/\n/g, '<br>') : '...';
-        
-        const answerHtml = `<div style="color: #10b981; font-size: 3.5vw; text-shadow: 0 0 15px rgba(16, 185, 129, 0.5); margin-top: 15px;">${answerText}</div>`;
-        
-        if (!textContainer.innerHTML.includes(answerText)) {
-            textContainer.innerHTML += answerHtml;
-        }
-
-        // Handle Side-by-Side Answer Media
-        if (message.responseType && message.responseType !== 'text' && message.responseUrl) {
-            const overlay = document.getElementById('active-clue-overlay');
-            let mediaWrapper = document.getElementById('all-media-wrapper');
-            
-            if (!mediaWrapper) {
-                mediaWrapper = document.createElement('div');
-                mediaWrapper.id = 'all-media-wrapper';
-                mediaWrapper.style.display = 'flex';
-                mediaWrapper.style.gap = '20px';
-                mediaWrapper.style.justifyContent = 'center';
-                mediaWrapper.style.alignItems = 'center';
-                mediaWrapper.style.flexWrap = 'wrap';
-                mediaWrapper.style.marginBottom = '15px';
-                mediaWrapper.style.width = '100%';
-                
-                const existingMedia = document.getElementById('media-container');
-                if (existingMedia) {
-                    overlay.insertBefore(mediaWrapper, existingMedia);
-                    mediaWrapper.appendChild(existingMedia);
-                    existingMedia.style.marginBottom = '0';
-                    existingMedia.style.flex = '0 1 auto';
-                } else {
-                    overlay.insertBefore(mediaWrapper, textContainer);
-                }
-            }
-            
-            const respContainer = document.createElement('div');
-            respContainer.id = 'response-media-container';
-            respContainer.style.flex = '0 1 auto';
-            respContainer.style.display = 'flex';
-            respContainer.style.justifyContent = 'center';
-            respContainer.style.alignItems = 'center';
-            respContainer.style.gap = '20px';
-            
-            if (message.responseType === 'image') {
-                const urls = message.responseUrl.split(',').map(u => u.trim());
-                urls.forEach(url => {
-                    const img = document.createElement('img');
-                    img.src = url;
-                    img.className = 'clue-image-multi';
-                    img.style.border = '4px solid #10b981';
-                    img.style.boxShadow = '0 0 20px rgba(16, 185, 129, 0.6)';
-                    
-                    img.addEventListener('click', () => {
-                        img.classList.toggle('zoomed');
-                    });
-
-                    respContainer.appendChild(img);
-                });
-            } else if (message.responseType === 'video') {
-                const vid = document.createElement('video');
-                vid.src = message.responseUrl;
-                vid.autoplay = true;
-                vid.controls = true;
-                vid.className = 'clue-video';
-                vid.style.maxWidth = '40vw';
-                vid.style.border = '4px solid #10b981';
-                vid.style.boxShadow = '0 0 20px rgba(16, 185, 129, 0.6)';
-                respContainer.appendChild(vid);
-            }
-            
-            mediaWrapper.appendChild(respContainer);
-            
-            const existingImgs = mediaWrapper.querySelectorAll('.clue-image');
-            existingImgs.forEach(img => img.className = 'clue-image-multi');
-            
-            const existingVids = mediaWrapper.querySelectorAll('.clue-video:not([src="'+message.responseUrl+'"])');
-            existingVids.forEach(vid => vid.style.maxWidth = '40vw');
-        }
-    } 
-    // NEW: Toggles the zoom class on all displayed images when triggered by the moderator
-    else if (message.type === 'TOGGLE_ZOOM') {
-        const overlayImgs = document.querySelectorAll('#active-clue-overlay img');
-        overlayImgs.forEach(img => {
-            img.classList.toggle('zoomed');
-        });
-    }
-    else if (message.type === 'CLOSE_CLUE') {
-        const overlay = document.getElementById('active-clue-overlay');
-        overlay.classList.remove('show-overlay');
-        
-        const existingMedia = document.getElementById('media-container');
-        if (existingMedia) existingMedia.remove();
-        
-        const existingWrapper = document.getElementById('all-media-wrapper');
-        if (existingWrapper) existingWrapper.remove();
-        
-        document.querySelectorAll('.remote-audio').forEach(a => {
-            a.pause();
-            a.remove();
-        });
-    }
-    else if (message.type === 'UPDATE_SCORES') {
-        updatePlayerScoresUI(message.teams);
-    }
-    else if (message.type === 'SHOW_FJ_CATEGORY') {
-        const overlay = document.getElementById('active-clue-overlay');
-        const textContainer = document.getElementById('clue-text');
-        
-        const existingMedia = document.getElementById('media-container');
-        if (existingMedia) existingMedia.remove();
-        
-        const existingWrapper = document.getElementById('all-media-wrapper');
-        if (existingWrapper) existingWrapper.remove();
-
-        textContainer.innerHTML = `
-            <div style='font-size: 4vw; color: #b0b0b0; text-transform: uppercase; font-weight: 700; letter-spacing: 2px;'>Final Jeopardy Category</div>
-            <div style='font-size: 7vw; color: var(--neon-yellow); text-transform: uppercase; font-weight: 900; margin-top: 15px; text-shadow: 0 0 20px rgba(255,204,0,0.5);'>${message.category}</div>
-        `;
-        overlay.classList.add('show-overlay');
-    }
-    else if (message.type === 'SHOW_FJ_PROMPT') {
-        const overlay = document.getElementById('active-clue-overlay');
-        const textContainer = document.getElementById('clue-text');
-        
-        renderPlayerMedia(message, textContainer, overlay);
-        overlay.classList.add('show-overlay');
-    }
-    else if (message.type === 'SYNC_TIMER') {
-        const timerEl = document.getElementById('player-timer');
-        timerEl.classList.remove('hidden');
-        timerEl.textContent = message.time;
-        
-        if (message.time <= 0) {
-            timerEl.classList.add('time-up');
-        } else {
-            timerEl.classList.remove('time-up');
-        }
-    }
-    else if (message.type === 'HIDE_TIMER') {
-        const timerEl = document.getElementById('player-timer');
-        if (timerEl) {
-            timerEl.classList.add('hidden');
-            timerEl.classList.remove('time-up');
-        }
-    }
-    else if (message.type === 'RESET_GAME') {
-        document.querySelectorAll('.cell.points').forEach(cell => cell.classList.remove('answered'));
-        document.getElementById('active-clue-overlay').classList.remove('show-overlay');
-        
-        const existingMedia = document.getElementById('media-container');
-        if (existingMedia) existingMedia.remove();
-        
-        const existingWrapper = document.getElementById('all-media-wrapper');
-        if (existingWrapper) existingWrapper.remove();
-        
-        document.querySelectorAll('.remote-audio').forEach(a => {
-            a.pause();
-            a.remove();
-        });
-    }
-};
-
-function buildPlayerBoard(data) {
-    const board = document.getElementById('game-board');
-    board.innerHTML = ''; 
-
-    data.categories.forEach(category => {
-        const catDiv = document.createElement('div');
-        catDiv.className = 'cell category';
-        catDiv.textContent = category.name;
-        board.appendChild(catDiv);
-    });
-
-    for (let row = 0; row < 5; row++) {
-        for (let col = 0; col < data.categories.length; col++) {
-            const clue = data.categories[col].clues[row];
-            const pointsDiv = document.createElement('div');
-            pointsDiv.className = 'cell points';
-            pointsDiv.id = `clue-${col}-${row}`; 
-            pointsDiv.textContent = clue.points;
-            board.appendChild(pointsDiv);
-        }
+function handleMessage(message) {
+    switch (message.type) {
+        case 'SYNC_FULL_STATE': return restore(message.state);
+        case 'LOAD_GAME': closeOverlay(); return buildBoard(message.data);
+        case 'SHOW_DAILY_DOUBLE': return showDailyDouble(message);
+        case 'SHOW_PROMPT': return showPrompt(message);
+        case 'SHOW_ANSWER':
+        case 'SHOW_FJ_ANSWER': return showAnswer(message);
+        case 'SHOW_FJ_CATEGORY': return showFinalCategory(message);
+        case 'SHOW_FJ_PROMPT': return showPrompt(message);
+        case 'PLAY_AUDIO_REMOTE': return playRemoteAudio(message.url);
+        case 'TOGGLE_ZOOM': return overlay.querySelectorAll('img').forEach(img => img.classList.toggle('zoomed'));
+        case 'CLOSE_CLUE': return closeOverlay();
+        case 'UPDATE_SCORES': return renderScores(message.teams);
+        case 'SYNC_TIMER': return showTimer(message.time);
+        case 'HIDE_TIMER': return hideTimer();
+        case 'RESET_GAME':
+            document.querySelectorAll('.cell.points').forEach(cell => cell.classList.remove('answered'));
+            return closeOverlay();
     }
 }
 
-// Extracted UI Logic for rendering both Standard and Final Jeopardy Media
-function renderPlayerMedia(message, textContainer, overlay) {
-    const existingMedia = document.getElementById('media-container');
-    if (existingMedia) existingMedia.remove();
-    
-    const existingWrapper = document.getElementById('all-media-wrapper');
-    if (existingWrapper) existingWrapper.remove();
+/* ---------- Restore after (re)connect ---------- */
+function restore(state) {
+    if (state.gameData) {
+        buildBoard(state.gameData);
+        (state.answeredClues || []).forEach(id => $id(id)?.classList.add('answered'));
+    }
+    if (state.teams) renderScores(state.teams);
 
-    if (message.mediaType === 'image' && message.mediaUrl) {
-        const urls = message.mediaUrl.split(',').map(u => u.trim());
+    // Replay what was on screen, so a refreshed projector picks up mid-clue.
+    if (state.activeOverlay) {
+        handleMessage(state.activeOverlay);
+        if (state.answerOverlay) handleMessage(state.answerOverlay);
+    } else {
+        closeOverlay();
+    }
+}
+
+/* ---------- Board ---------- */
+function buildBoard(data) {
+    normalizeGame(data);
+    const board = $id('game-board');
+    board.innerHTML = '';
+    board.style.setProperty('--cols', data.categories.length);
+    board.style.setProperty('--rows', gameRows(data));
+
+    data.categories.forEach(category => {
+        const cell = document.createElement('div');
+        cell.className = 'cell category';
+        cell.textContent = category.name;
+        board.appendChild(cell);
+    });
+
+    for (let row = 0; row < gameRows(data); row++) {
+        data.categories.forEach((category, col) => {
+            const clue = category.clues[row];
+            const cell = document.createElement('div');
+            cell.className = 'cell points';
+            if (clue) {
+                cell.id = clueId(col, row);
+                cell.textContent = clue.points;
+            } else {
+                cell.style.visibility = 'hidden';
+            }
+            board.appendChild(cell);
+        });
+    }
+}
+
+/* ---------- Overlay helpers ---------- */
+function clearMedia() {
+    $id('media-container')?.remove();
+    $id('all-media-wrapper')?.remove();
+    answerText.innerHTML = '';
+    overlay.querySelectorAll('.remote-audio').forEach(a => { a.pause(); a.remove(); });
+}
+
+function openOverlay() { overlay.classList.add('show-overlay'); }
+
+function closeOverlay() {
+    overlay.classList.remove('show-overlay');
+    clearMedia();
+}
+
+function markPlayed(id) { if (id) $id(id)?.classList.add('answered'); }
+
+function showDailyDouble(message) {
+    markPlayed(message.clueId);
+    clearMedia();
+    clueText.innerHTML = '<div class="splash-dd">Daily Double</div>';
+    openOverlay();
+}
+
+function showFinalCategory(message) {
+    clearMedia();
+    clueText.innerHTML = `
+        <div class="fj-label">Final Jeopardy Category</div>
+        <div class="fj-category">${safeHtml(message.category)}</div>`;
+    openOverlay();
+}
+
+function showPrompt(message) {
+    markPlayed(message.clueId);
+    clearMedia();
+    renderPrompt(message);
+    openOverlay();
+}
+
+/* Prompt text + any image / video / audio indicator */
+function renderPrompt(message) {
+    const { mediaType, mediaUrl } = message;
+    const prompt = message.prompt || '';
+
+    if (mediaType === 'image' && mediaUrl) {
+        const urls = splitUrls(mediaUrl);
         const gallery = document.createElement('div');
-        gallery.id = 'media-container'; 
-        gallery.className = urls.length > 1 ? 'media-gallery' : '';
-        
+        gallery.id = 'media-container';
+        if (urls.length > 1) gallery.className = 'media-gallery';
         urls.forEach(url => {
             const img = document.createElement('img');
             img.src = url;
             img.className = urls.length > 1 ? 'clue-image-multi' : 'clue-image';
-            
-            img.addEventListener('click', () => {
-                img.classList.toggle('zoomed');
-            });
-
+            img.addEventListener('click', () => img.classList.toggle('zoomed'));
             gallery.appendChild(img);
         });
-        
-        overlay.insertBefore(gallery, textContainer);
-        textContainer.textContent = message.prompt;
-    } 
-    else if (message.mediaType === 'video' && message.mediaUrl) {
+        overlay.insertBefore(gallery, clueText);
+        clueText.innerHTML = safeHtml(prompt);
+    } else if (mediaType === 'video' && mediaUrl) {
         const vid = document.createElement('video');
-        vid.src = message.mediaUrl;
+        vid.src = mediaUrl;
         vid.autoplay = true;
         vid.className = 'clue-video';
-        vid.id = 'media-container'; 
-        overlay.insertBefore(vid, textContainer);
-        textContainer.textContent = message.prompt;
-    }
-    else if (message.mediaType === 'audio' && message.mediaUrl) {
-        textContainer.innerHTML = "🎧 <em>Waiting for Host to start audio...</em><br><br>" + message.prompt;
-    }
-    else if (message.mediaType === 'youtube' || message.mediaType === 'spotify') {
-        textContainer.innerHTML = "🎧 <em>Listening to Audio Clue...</em><br><br>" + message.prompt;
-    }
-    else {
-        textContainer.innerHTML = message.prompt.replace(/\n/g, '<br>'); 
+        vid.id = 'media-container';
+        overlay.insertBefore(vid, clueText);
+        clueText.innerHTML = safeHtml(prompt);
+    } else if (mediaType === 'audio' && mediaUrl) {
+        clueText.innerHTML = '🎧 <em>Waiting for Host to start audio...</em><br><br>' + safeHtml(prompt);
+    } else if (mediaType === 'youtube' || mediaType === 'spotify') {
+        clueText.innerHTML = '🎧 <em>Listening to Audio Clue...</em><br><br>' + safeHtml(prompt);
+    } else {
+        clueText.innerHTML = safeHtml(prompt);
     }
 }
 
-function updatePlayerScoresUI(teams) {
-    const scoreBoard = document.getElementById('score-board');
-    
-    while (scoreBoard.children.length > teams.length) {
-        scoreBoard.removeChild(scoreBoard.lastChild);
-    }
+/* Answer text, plus optional answer media shown beside the prompt media */
+function showAnswer(message) {
+    answerText.innerHTML = safeHtml(message.answer || '...');
+    openOverlay();
 
-    while (scoreBoard.children.length < teams.length) {
-        const newTeamDiv = document.createElement('div');
-        newTeamDiv.className = 'player-team';
-        newTeamDiv.innerHTML = `
-            <div class="team-name"></div>
-            <div class="team-score"></div>
-        `;
-        scoreBoard.appendChild(newTeamDiv);
-    }
+    const { responseType, responseUrl } = message;
+    if (!responseType || responseType === 'text' || !responseUrl) return;
 
-    teams.forEach((team, index) => {
-        const teamDiv = scoreBoard.children[index];
-        if (teamDiv) {
-            teamDiv.id = `display-team-${index}`; 
-            teamDiv.querySelector('.team-name').textContent = team.name;
-            teamDiv.querySelector('.team-score').textContent = team.score;
-        }
+    let wrapper = $id('all-media-wrapper');
+    if (!wrapper) {
+        wrapper = document.createElement('div');
+        wrapper.id = 'all-media-wrapper';
+        const promptMedia = $id('media-container');
+        overlay.insertBefore(wrapper, promptMedia || clueText);
+        if (promptMedia) wrapper.appendChild(promptMedia);
+    }
+    $id('response-media-container')?.remove();
+
+    const box = document.createElement('div');
+    box.id = 'response-media-container';
+    if (responseType === 'image') {
+        splitUrls(responseUrl).forEach(url => {
+            const img = document.createElement('img');
+            img.src = url;
+            img.className = 'clue-image-multi answer-media';
+            img.addEventListener('click', () => img.classList.toggle('zoomed'));
+            box.appendChild(img);
+        });
+    } else if (responseType === 'video') {
+        const vid = document.createElement('video');
+        vid.src = responseUrl;
+        vid.autoplay = true;
+        vid.controls = true;
+        vid.className = 'clue-video answer-media';
+        box.appendChild(vid);
+    }
+    wrapper.appendChild(box);
+
+    // Shrink the prompt media so both fit side by side.
+    wrapper.querySelectorAll('.clue-image').forEach(img => { img.className = 'clue-image-multi'; });
+    wrapper.querySelectorAll('.clue-video:not(.answer-media)').forEach(v => { v.style.maxWidth = '40vw'; });
+}
+
+function playRemoteAudio(url) {
+    const audio = document.createElement('audio');
+    audio.src = url;
+    audio.autoplay = true;
+    audio.className = 'remote-audio';
+    audio.style.display = 'none';
+    overlay.appendChild(audio);
+}
+
+/* ---------- Timer ---------- */
+function showTimer(time) {
+    const el = $id('player-timer');
+    el.classList.remove('hidden');
+    el.textContent = time;
+    el.classList.toggle('time-up', time <= 0);
+}
+
+function hideTimer() {
+    const el = $id('player-timer');
+    el.classList.add('hidden');
+    el.classList.remove('time-up');
+}
+
+/* ---------- Scores ---------- */
+function renderScores(teams) {
+    const board = $id('score-board');
+    while (board.children.length > teams.length) board.lastChild.remove();
+    while (board.children.length < teams.length) {
+        const div = document.createElement('div');
+        div.className = 'player-team';
+        div.innerHTML = '<div class="team-name"></div><div class="team-score"></div>';
+        board.appendChild(div);
+    }
+    teams.forEach((team, i) => {
+        const div = board.children[i];
+        div.id = `display-team-${i}`;
+        div.querySelector('.team-name').textContent = team.name;
+        div.querySelector('.team-score').textContent = team.score;
     });
 }

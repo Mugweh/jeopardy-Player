@@ -3,71 +3,92 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Lyrics Game - Moderator View</title>
+    <title>Lyrics Moderator – Trivia Night</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap">
+    <link rel="stylesheet" href="ui.css">
     <link rel="stylesheet" href="moderator.css">
 </head>
 <body>
-    <header>
-        <h1>Lyrics Moderator Dashboard</h1>
-        <div>
-            <input type="file" id="lyrics-file" accept=".json">
-            <button onclick="window.open('lyrics_player.html', '_blank')">Open Big Screen View</button>
-            <button onclick="window.open('lyrics_buzzer.html', '_blank')" style="background:#10b981;">Open Buzzer View</button>
-        </div>
-    </header>
 
-    <main>
-        <section id="mini-board-container" style="flex:1;">
-            <h2>Round Control</h2>
-            <div id="round-status" style="font-size: 1.5rem; color: var(--neon-yellow); margin-bottom: 15px;">No Game Loaded</div>
-            
+<header class="app-header">
+    <div class="brand">
+        <div class="logo">♪</div>
+        <div>
+            <h1>Lyrics Moderator</h1>
+            <div class="subtitle" id="pack-title">No pack loaded</div>
+        </div>
+    </div>
+    <div class="toolbar">
+        <span id="conn-pill" class="pill"><span class="dot"></span>Connecting…</span>
+        <input type="file" id="lyrics-file" accept=".json,application/json" hidden>
+        <label class="btn btn-primary" for="lyrics-file">📂 Load lyrics pack</label>
+        <button onclick="window.open('lyrics_player.html', '_blank')">🖥 Big screen</button>
+        <button onclick="window.open('lyrics_buzzer.html', '_blank')" class="success">📱 Phone view</button>
+    </div>
+</header>
+
+<main class="layout" style="grid-template-columns: minmax(0,1fr) minmax(0,1fr);">
+
+    <section class="side-col">
+        <div class="card">
+            <div class="card-head">
+                <span class="card-title">Round control</span>
+                <span id="round-status" class="pill gold">No game loaded</span>
+            </div>
+
             <div class="prompt-box">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-                    <strong>Current Lyric Snippet:</strong>
-                    <span id="snippet-tracker" style="color: var(--neon-yellow); font-weight: bold;">Snippet 1 of 1</span>
+                <div class="card-head" style="margin:0">
+                    <div class="box-label">Lyric snippet <span>— shown on the big screen</span></div>
+                    <span id="snippet-tracker" class="pill">Snippet 1 of 1</span>
                 </div>
-                <p id="mod-lyrics-text" style="font-size: 1.2rem; line-height: 1.5;">Load a lyrics_game.json file to start.</p>
-                <div style="display: flex; gap: 10px; margin-top: 15px;">
-                    <button id="btn-prev-snippet" style="background: #444; flex: 1;">◀ Previous Snippet</button>
-                    <button id="btn-next-snippet" style="background: var(--accent-blue); flex: 1;">Next Snippet ▶</button>
+                <p id="mod-lyrics-text" class="snippet-text placeholder">Load a lyrics_game.json file to start.</p>
+                <div class="button-row tight">
+                    <button id="btn-prev-snippet">◀ Previous <kbd>←</kbd></button>
+                    <button id="btn-next-snippet" class="primary">Next snippet <kbd>→</kbd></button>
                 </div>
             </div>
 
             <div class="response-box">
-                <strong>Correct Anime Answer:</strong>
-                <p id="mod-answer-text">...</p>
+                <div class="box-label">Correct answer <span>— moderator only</span></div>
+                <p id="mod-answer-text" class="placeholder">…</p>
             </div>
 
-            <div id="mod-hints-list" style="margin-top:10px;"></div>
+            <div class="hint-stages" id="hint-stages"></div>
 
-            <div class="action-buttons" style="margin-top: 20px;">
-                <button id="btn-reveal-hint" style="background-color: var(--neon-yellow); color: #121212; font-weight:bold;">💡 Increase Hint Counter (Reduces Round Value)</button>
-                <button id="btn-reveal-answer" style="background-color: var(--accent-green);">👁️ Reveal Answer on Screen</button>
-                <button id="btn-next-round" style="background-color: var(--jeopardy-blue);">➡️ Go to Next Round</button>
-                <button id="btn-reset-claims" style="background-color: #8b5cf6;">Reset All Team Selections</button>
+            <div class="button-row">
+                <button id="btn-reveal-hint" class="warn">💡 Add hint <kbd>H</kbd></button>
+                <button id="btn-reveal-answer" class="success">👁 Reveal answer <kbd>A</kbd></button>
             </div>
-        </section>
+            <div class="button-row">
+                <button id="btn-prev-round" class="ghost">◀ Previous round</button>
+                <button id="btn-next-round" class="primary">Next round ▶ <kbd>N</kbd></button>
+            </div>
+            <p class="hint">Each hint lowers the round’s value by 1 point (4 → 1).</p>
+        </div>
+    </section>
 
-        <section id="control-panel" style="flex:1.2;">
-            <div class="panel-section">
-                <h2>Player Submissions (Current Round)</h2>
-                <div id="submissions-list" style="display:flex; flex-direction:column; gap:10px; margin-top:15px;">
-                    <em style="color:#666;">No submissions yet.</em>
+    <section class="side-col">
+        <div class="card">
+            <div class="card-head"><span class="card-title">Player submissions</span></div>
+            <div id="submissions-list" style="display:flex; flex-direction:column; gap:.6rem;"></div>
+        </div>
+
+        <div class="card">
+            <div class="card-head">
+                <span class="card-title">Teams &amp; scores</span>
+                <div class="toolbar tight">
+                    <label class="bonus-field"><span>Manual points</span><input type="number" id="manual-score-input" value="1" min="1"></label>
+                    <button id="btn-reset-claims" class="ghost sm">📱 Reset picks</button>
                 </div>
             </div>
+            <div id="mod-scores-list"></div>
+        </div>
+    </section>
+</main>
 
-            <div class="panel-section">
-                <h2>Teams & Scoreboard (Lyrics Mode)</h2>
-                <div style="margin-bottom: 15px; display: flex; align-items: center; gap: 10px;">
-                    <label style="font-size: 0.9rem; color: var(--neon-yellow); font-weight: bold;">Manual Points:</label>
-                    <input type="number" id="manual-score-input" value="1" style="padding: 6px; font-size: 1rem; background: #1a1a1a; color: white; border: 1px solid var(--accent-blue); border-radius: 4px; width: 80px;">
-                </div>
-                <div id="mod-scores-list" style="display:flex; flex-direction:column; gap:10px;"></div>
-            </div>
-        </section>
-    </main>
-
-    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
-    <script src="lyrics_moderator.js"></script>
+<script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+<script src="common.js"></script>
+<script src="lyrics_moderator.js"></script>
 </body>
 </html>

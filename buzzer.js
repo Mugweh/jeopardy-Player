@@ -101,6 +101,15 @@ gameChannel.onmessage = (event) => {
             isEnabled = false;
         }
     } 
+    else if (msg.type === 'CLAIM_DENIED') {
+        // Someone else grabbed this team a moment before us.
+        if (msg.team === myTeam) {
+            myTeam = "";
+            document.getElementById('setup-screen').classList.remove('hidden');
+            document.getElementById('buzzer-screen').classList.add('hidden');
+            alert('Someone else just picked that team. Please choose another.');
+        }
+    }
     else if (msg.type === 'REQUEST_WAGER') {
         if (msg.team === myTeam) {
             document.getElementById('buzzer-screen').classList.add('hidden');

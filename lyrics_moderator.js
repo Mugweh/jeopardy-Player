@@ -1,170 +1,169 @@
+'use strict';
+/* Lyrics-game moderator. All state lives on the server; this page renders it. */
+
+const { $, el, readJsonFile, toast, bindConnectionPill, isTyping } = Common;
+
 const socket = io();
+bindConnectionPill(socket, $('#conn-pill'));
+const send = msg => socket.emit('game_event', msg);
+
 let lyricsState = null;
 let sharedTeams = [];
+let claimed = [];
 
-socket.on('game_event', (data) => {
-    if (data.type === 'SYNC_FULL_STATE') {
-        sharedTeams = data.state.teams || [];
-        if (data.state.lyricsState) {
-            lyricsState = data.state.lyricsState;
-            renderModeratorUI();
-        }
-    }
-    else if (data.type === 'SYNC_LYRICS_STATE' || data.type === 'UPDATE_LYRICS_STATE') {
-        lyricsState = data.state;
-        renderModeratorUI();
-    }
-    else if (data.type === 'UPDATE_SCORES') {
-        sharedTeams = data.teams || [];
-        renderModeratorUI();
+socket.on('game_event', data => {
+    switch (data.type) {
+        case 'SYNC_FULL_STATE':
+            sharedTeams = data.state.teams || [];
+            claimed = data.state.claimedTeams || [];
+            if (data.state.lyricsState) lyricsState = data.state.lyricsState;
+            return render();
+        case 'SYNC_LYRICS_STATE':
+        case 'UPDATE_LYRICS_STATE':
+            lyricsState = data.state;
+            return render();
+        case 'UPDATE_SCORES': sharedTeams = data.teams || []; return render();
+        case 'UPDATE_CLAIMS': claimed = data.claimedTeams || []; return render();
     }
 });
 
-document.getElementById('lyrics-file').addEventListener('change', (e) => {
+$('#lyrics-file').addEventListener('change', async e => {
     const file = e.target.files[0];
+    e.target.value = '';
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (evt) => {
-        try {
-            const data = JSON.parse(evt.target.result);
-            if (data.rounds) {
-                data.rounds.forEach(r => {
-                    if (typeof r.lyrics === 'string') r.lyrics = [r.lyrics];
-                });
-            }
-            socket.emit('game_event', { type: 'LOAD_LYRICS_GAME', data: data });
-        } catch (err) { alert("Invalid JSON file."); }
-    };
-    reader.readAsText(file);
+    try {
+        const data = await readJsonFile(file);
+        if (!Array.isArray(data.rounds)) throw new Error('This file has no "rounds" list, so it isn’t a lyrics pack.');
+        // Older packs stored a single string instead of a list of snippets.
+        data.rounds.forEach(r => { if (typeof r.lyrics === 'string') r.lyrics = [r.lyrics]; });
+        send({ type: 'LOAD_LYRICS_GAME', data });
+        toast(`Loaded “${data.title || 'lyrics pack'}”.`, { type: 'success' });
+    } catch (err) {
+        toast(err.message, { type: 'error' });
+    }
 });
 
-function renderModeratorUI() {
-    if (!lyricsState || !lyricsState.gameData) return;
+function setText(sel, text, placeholder) {
+    const n = $(sel);
+    n.textContent = text || placeholder;
+    n.classList.toggle('placeholder', !text);
+}
 
-    const game = lyricsState.gameData;
+function render() {
+    const game = lyricsState?.gameData;
+    $('#pack-title').textContent = game ? (game.title || 'Untitled pack') : 'No pack loaded';
+    if (!game) return renderTeams();
+
     const rIdx = lyricsState.currentRound;
-    const currentRound = game.rounds[rIdx];
+    const round = game.rounds[rIdx];
+    const hints = lyricsState.hintsRevealed || 0;
 
-    document.getElementById('round-status').textContent = `Round ${rIdx + 1} of ${game.rounds.length} | Max Points: ${4 - lyricsState.hintsRevealed}`;
-    
-    // Snippets Handling
-    if (currentRound && currentRound.lyrics && currentRound.lyrics.length > 0) {
-        const sIdx = lyricsState.currentLyricSection || 0;
-        document.getElementById('snippet-tracker').textContent = `Snippet ${sIdx + 1} of ${currentRound.lyrics.length}`;
-        document.getElementById('mod-lyrics-text').textContent = currentRound.lyrics[sIdx] || '(Empty Snippet)';
-    } else {
-        document.getElementById('snippet-tracker').textContent = `Snippet 0 of 0`;
-        document.getElementById('mod-lyrics-text').textContent = 'End of game or no lyrics.';
-    }
+    $('#round-status').textContent = round
+        ? `Round ${rIdx + 1} of ${game.rounds.length} · worth ${4 - hints} pt${4 - hints === 1 ? '' : 's'}`
+        : 'Game over';
 
-    document.getElementById('mod-answer-text').textContent = currentRound ? currentRound.answer : '...';
+    const snippets = round?.lyrics || [];
+    const sIdx = lyricsState.currentLyricSection || 0;
+    $('#snippet-tracker').textContent = `Snippet ${snippets.length ? sIdx + 1 : 0} of ${snippets.length}`;
+    setText('#mod-lyrics-text', snippets.length ? (snippets[sIdx] || '(empty snippet)') : '', round ? 'No lyrics in this round.' : 'All rounds finished.');
+    setText('#mod-answer-text', round?.answer, '…');
 
-    // Hints Counter Status
-    const hintsDiv = document.getElementById('mod-hints-list');
-    hintsDiv.innerHTML = `<strong>Hints Revealed (via Wheel): ${lyricsState.hintsRevealed} / 3</strong>`;
-    for (let i = 1; i <= 3; i++) {
-        const isShown = i <= lyricsState.hintsRevealed;
-        hintsDiv.innerHTML += `<div style="padding:5px; margin-top:5px; background:${isShown ? '#059669' : '#2a2a2a'}; border-radius:4px;">Hint Stage ${i}${isShown ? ' (ACTIVE)' : ''}</div>`;
-    }
+    $('#btn-prev-snippet').disabled = sIdx <= 0;
+    $('#btn-next-snippet').disabled = sIdx >= snippets.length - 1;
+    $('#btn-reveal-hint').disabled = hints >= 3 || !round;
+    $('#btn-reveal-answer').disabled = !round || !!lyricsState.answerRevealed;
+    $('#btn-prev-round').disabled = rIdx <= 0;
+    $('#btn-next-round').disabled = !round;
 
-    // Render Player Submissions
-    const subList = document.getElementById('submissions-list');
-    subList.innerHTML = '';
-    const subs = lyricsState.submissions || {};
-    const subTeams = Object.keys(subs);
+    const stages = $('#hint-stages');
+    stages.innerHTML = '';
+    for (let i = 1; i <= 3; i++) stages.append(el('span', { class: i <= hints ? 'on' : '', text: `Hint ${i}${i <= hints ? ' ✓' : ''}` }));
 
-    if (subTeams.length === 0) {
-        subList.innerHTML = '<em style="color:#666;">No submissions yet for this round.</em>';
-    } else {
-        subTeams.forEach(team => {
-            const entry = subs[team];
-            const ptsVal = 4 - entry.stage;
-            const item = document.createElement('div');
-            item.style.padding = '10px';
-            item.style.background = '#2a2a2a';
-            item.style.borderRadius = '6px';
-            item.style.display = 'flex';
-            item.style.justifyContent = 'space-between';
-            item.style.alignItems = 'center';
+    renderSubmissions(lyricsState.submissions || {});
+    renderTeams();
+}
 
-            item.innerHTML = `
-                <div>
-                    <strong style="color:var(--neon-yellow);">${team}</strong> (at ${entry.stage} hints | Value: ${ptsVal} pts)
-                    <div style="font-size:1.1rem; margin-top:4px;">"${entry.answer}"</div>
-                    <div style="font-size:0.85rem; color:${entry.status === 'CORRECT' ? '#10b981' : entry.status === 'INCORRECT' ? '#ef4444' : '#ccc'}">Status: ${entry.status}</div>
-                </div>
-                <div style="display:flex; gap:6px;">
-                    <button onclick="gradeTeam('${team}', true)" style="background:#10b981; padding:6px 10px;">Correct (+${ptsVal})</button>
-                    <button onclick="gradeTeam('${team}', false)" style="background:#ef4444; padding:6px 10px;">Incorrect (-${ptsVal})</button>
-                </div>
-            `;
-            subList.appendChild(item);
-        });
-    }
+function renderSubmissions(subs) {
+    const list = $('#submissions-list');
+    list.innerHTML = '';
+    const teams = Object.keys(subs);
+    if (!teams.length) return list.append(el('p', { class: 'hint', text: 'No submissions yet this round.' }));
 
-    // Render Shared Teams & Scoreboard with Manual Adjustment + Unclaim Controls
-    const scoreDiv = document.getElementById('mod-scores-list');
-    scoreDiv.innerHTML = '';
-    
-    // Merge shared teams with lyrics score state
-    const allTeams = Array.from(new Set([...sharedTeams.map(t => t.name), ...Object.keys(lyricsState.scores || {})]));
-
-    allTeams.forEach(teamName => {
-        const score = lyricsState.scores[teamName] || 0;
-        const row = document.createElement('div');
-        row.className = 'team';
-        row.style.marginBottom = '8px';
-        
-        row.innerHTML = `
-            <span style="font-weight:bold; font-size:1.1rem;">${teamName}</span>
-            <div class="score-controls">
-                <button class="btn-unclaim-team" onclick="unclaimTeam('${teamName}')" title="Unclaim Team" style="background-color: #8b5cf6; color: white; padding: 4px 10px;">🔓</button>
-                <button onclick="adjustScore('${teamName}', -1)" style="padding:4px 10px;">-</button>
-                <span class="score" style="min-width:35px; text-align:center; color:var(--neon-yellow);">${score}</span>
-                <button onclick="adjustScore('${teamName}', 1)" style="padding:4px 10px;">+</button>
-            </div>
-        `;
-        scoreDiv.appendChild(row);
+    teams.forEach(team => {
+        const entry = subs[team];
+        const pts = 4 - entry.stage;
+        const status = (entry.status || 'PENDING').toLowerCase();
+        list.append(el('div', { class: `submission ${status}` },
+            el('div', {},
+                el('strong', { style: 'color:var(--gold)', text: team }),
+                el('span', { class: 'hint', text: `  locked in after ${entry.stage} hint${entry.stage === 1 ? '' : 's'} · worth ${pts}` }),
+                el('div', { class: 'answer', text: `“${entry.answer}”` }),
+                el('div', { class: `status-tag ${status}`, text: status })
+            ),
+            el('div', { style: 'display:flex; gap:.4rem' },
+                el('button', { class: 'success sm', text: `✓ +${pts}`, disabled: status === 'correct', onclick: () => send({ type: 'GRADE_LYRICS_SUBMISSION', team, isCorrect: true }) }),
+                el('button', { class: 'danger sm', text: `✗ −${pts}`, disabled: status === 'incorrect', onclick: () => send({ type: 'GRADE_LYRICS_SUBMISSION', team, isCorrect: false }) })
+            )
+        ));
     });
 }
 
-function gradeTeam(team, isCorrect) {
-    socket.emit('game_event', { type: 'GRADE_LYRICS_SUBMISSION', team: team, isCorrect: isCorrect });
+function renderTeams() {
+    const box = $('#mod-scores-list');
+    box.innerHTML = '';
+    const scores = lyricsState?.scores || {};
+    const names = [...new Set([...sharedTeams.map(t => t.name), ...Object.keys(scores)])];
+    if (!names.length) return box.append(el('p', { class: 'hint', text: 'No teams yet.' }));
+
+    names.forEach(name => {
+        const score = scores[name] || 0;
+        const isClaimed = claimed.includes(name);
+        box.append(el('div', { class: 'team', style: 'grid-template-columns: minmax(0,1fr) auto' },
+            el('div', { class: 'team-id' },
+                el('span', { class: `phone${isClaimed ? ' on' : ''}`, text: '📱', title: 'A phone has joined as this team' }),
+                el('strong', { text: name })
+            ),
+            el('div', { class: 'score-controls' },
+                el('button', { class: 'award minus', text: '−', onclick: () => adjust(name, -1) }),
+                el('span', { class: `score${score < 0 ? ' negative' : ''}`, style: 'display:inline-block;text-align:center;', text: score }),
+                el('button', { class: 'award plus', text: '+', onclick: () => adjust(name, +1) }),
+                isClaimed && el('button', {
+                    class: 'sm ghost', text: '🔓', title: 'Force this team’s phone to rejoin',
+                    onclick: () => { if (confirm(`Force the phone on “${name}” to rejoin?`)) send({ type: 'UNCLAIM_TEAM', team: name }); }
+                })
+            )
+        ));
+    });
 }
 
-function adjustScore(team, direction) {
-    const amount = parseInt(document.getElementById('manual-score-input').value, 10) || 1;
-    socket.emit('game_event', { type: 'ADJUST_LYRICS_SCORE', team: team, amount: amount * direction });
+function adjust(team, direction) {
+    const amount = parseInt($('#manual-score-input').value, 10) || 1;
+    send({ type: 'ADJUST_LYRICS_SCORE', team, amount: amount * direction });
 }
 
-function unclaimTeam(teamName) {
-    if (confirm(`Force player on "${teamName}" to unclaim and rejoin?`)) {
-        socket.emit('game_event', { type: 'UNCLAIM_TEAM', team: teamName });
-    }
-}
-
-document.getElementById('btn-prev-snippet').addEventListener('click', () => {
-    socket.emit('game_event', { type: 'CYCLE_LYRICS_SECTION', direction: -1 });
+const cycle = direction => send({ type: 'CYCLE_LYRICS_SECTION', direction });
+$('#btn-prev-snippet').addEventListener('click', () => cycle(-1));
+$('#btn-next-snippet').addEventListener('click', () => cycle(1));
+$('#btn-reveal-hint').addEventListener('click', () => send({ type: 'REVEAL_LYRICS_HINT' }));
+$('#btn-reveal-answer').addEventListener('click', () => send({ type: 'REVEAL_LYRICS_ANSWER' }));
+$('#btn-prev-round').addEventListener('click', () => { if (confirm('Go back to the previous round? Submissions for the current round will be cleared.')) send({ type: 'PREV_LYRICS_ROUND' }); });
+$('#btn-next-round').addEventListener('click', () => {
+    const subs = Object.values(lyricsState?.submissions || {});
+    if (subs.some(s => s.status === 'PENDING') && !confirm('Some submissions are still ungraded. Go to the next round anyway?')) return;
+    send({ type: 'NEXT_LYRICS_ROUND' });
+});
+$('#btn-reset-claims').addEventListener('click', () => {
+    if (confirm('Send every phone back to the team-selection screen?')) send({ type: 'RESET_CLAIMS' });
 });
 
-document.getElementById('btn-next-snippet').addEventListener('click', () => {
-    socket.emit('game_event', { type: 'CYCLE_LYRICS_SECTION', direction: 1 });
+document.addEventListener('keydown', e => {
+    if (isTyping() || e.ctrlKey || e.metaKey || e.altKey) return;
+    const k = e.key.toLowerCase();
+    if (e.key === 'ArrowLeft') cycle(-1);
+    else if (e.key === 'ArrowRight') cycle(1);
+    else if (k === 'h') $('#btn-reveal-hint').click();
+    else if (k === 'a') $('#btn-reveal-answer').click();
+    else if (k === 'n') $('#btn-next-round').click();
 });
 
-document.getElementById('btn-reveal-hint').addEventListener('click', () => {
-    socket.emit('game_event', { type: 'REVEAL_LYRICS_HINT' });
-});
-
-document.getElementById('btn-reveal-answer').addEventListener('click', () => {
-    socket.emit('game_event', { type: 'REVEAL_LYRICS_ANSWER' });
-});
-
-document.getElementById('btn-next-round').addEventListener('click', () => {
-    socket.emit('game_event', { type: 'NEXT_LYRICS_ROUND' });
-});
-
-document.getElementById('btn-reset-claims').addEventListener('click', () => {
-    if (confirm("Force all buzzed-in players back to the setup screen?")) {
-        socket.emit('game_event', { type: 'RESET_CLAIMS' });
-    }
-});
+render();
