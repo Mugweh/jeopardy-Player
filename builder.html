@@ -3,130 +3,163 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Trivia Builder - Game CMS</title>
+    <title>Game Builder – Trivia Night</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap">
+    <link rel="stylesheet" href="ui.css">
     <link rel="stylesheet" href="builder.css">
 </head>
 <body>
 
-    <header>
-        <div class="title-container">
-            <label>Game Title:</label>
-            <input type="text" id="game-title" value="New Jeopardy Game">
-        </div>
-        <div class="controls" style="display: flex; align-items: center; gap: 10px;">
-            <div style="background: var(--surface); padding: 5px 10px; border-radius: 6px; border: 1px solid var(--border-color);">
-                <label style="font-size: 0.9rem; color: #ccc;">Base Points:</label>
-                <input type="number" id="point-multiplier" value="100" style="width: 60px; background: #121212; color: var(--neon-yellow); border: 1px solid var(--border-color); padding: 5px; border-radius: 4px;">
-                <button id="btn-apply-multiplier" class="btn-primary" style="padding: 6px 10px;">Apply</button>
-            </div>
-            
-            <button id="btn-edit-fj" style="background-color: var(--jeopardy-blue); color: white;">Edit Final Jeopardy</button>
-            
-            <input type="file" id="import-file" accept=".json" style="display: none;">
-            <button id="btn-import" onclick="document.getElementById('import-file').click()">Load Existing</button>
-            <button id="btn-export">Export game.json</button>
-        </div>
-    </header>
-
-    <main>
-        <div id="builder-board">
-            <!-- Board is generated via JavaScript -->
-        </div>
-    </main>
-
-    <!-- Final Jeopardy Modal -->
-    <div id="fj-modal" class="hidden" style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.8); backdrop-filter: blur(5px); display: flex; justify-content: center; align-items: center; z-index: 100;">
-        <div class="modal-content">
-            <h2 style="color: var(--neon-yellow);">Edit Final Jeopardy</h2>
-            
-            <label>Category:</label>
-            <input type="text" id="build-fj-category" placeholder="Enter FJ Category...">
-
-            <label>Prompt Media Type:</label>
-            <select id="build-fj-type">
-                <option value="text">Standard Text</option>
-                <option value="image">Image(s) (Comma-separate for multiple)</option>
-                <option value="video">Local Video (e.g., media/clip.mp4)</option>
-                <option value="audio">Local Audio (e.g., media/song.mp3)</option>
-                <option value="youtube">YouTube Video</option>
-                <option value="spotify">Spotify Track</option>
-            </select>
-
-            <div id="build-fj-url-container" class="hidden">
-                <label>Prompt Media URL / Path:</label>
-                <input type="text" id="build-fj-url" placeholder="e.g., https://youtu.be/... or images/pic.jpg">
-            </div>
-
-            <label>Prompt (The Question):</label>
-            <textarea id="build-fj-prompt" rows="3" placeholder="Enter the final question..."></textarea>
-
-            <label>Response (The Answer):</label>
-            <input type="text" id="build-fj-answer" placeholder="Enter the final answer...">
-
-            <label style="margin-top: 10px;">Response Media Type (Optional):</label>
-            <select id="build-fj-response-type">
-                <option value="text">None / Standard Text</option>
-                <option value="image">Image(s) (Comma-separate for multiple)</option>
-                <option value="video">Local Video (e.g., media/clip.mp4)</option>
-            </select>
-
-            <div id="build-fj-response-url-container" class="hidden">
-                <label>Response Media URL / Path:</label>
-                <input type="text" id="build-fj-response-url" placeholder="e.g., images/answer.jpg">
-            </div>
-
-            <div class="modal-actions">
-                <button id="btn-cancel-fj" class="btn-secondary">Cancel</button>
-                <button id="btn-save-fj" class="btn-primary">Save Final Jeopardy</button>
-            </div>
+<header class="app-header">
+    <div class="brand">
+        <div class="logo">J!</div>
+        <div class="title-wrap">
+            <input type="text" id="game-title" value="New Jeopardy Game" aria-label="Game title" spellcheck="false">
+            <div class="subtitle"><span id="fill-count">0 / 25 clues ready</span> · <span id="fj-status">Final Jeopardy: not set</span></div>
         </div>
     </div>
 
-    <!-- Edit Clue Modal -->
-    <div id="clue-modal" class="hidden">
-        <div class="modal-content">
-            <h2 id="modal-title">Edit Clue - 100 Points</h2>
-            
-            <label>Prompt Media Type:</label>
-            <select id="clue-type">
-                <option value="text">Standard Text</option>
-                <option value="image">Image(s) (Comma-separate for multiple)</option>
-                <option value="video">Local Video (e.g., media/clip.mp4)</option>
-                <option value="audio">Local Audio (e.g., media/song.mp3)</option>
-                <option value="youtube">YouTube Video</option>
-                <option value="spotify">Spotify Track</option>
-            </select>
+    <div class="toolbar">
+        <div class="points-box" title="Row values become 1×, 2×, 3×, 4×, 5× this number">
+            <label for="point-multiplier">Base points</label>
+            <input type="number" id="point-multiplier" value="100" min="1" step="10">
+            <button id="btn-apply-multiplier" class="sm primary">Apply</button>
+        </div>
+        <button id="btn-undo" class="ghost" title="Undo last shuffle / points change (Ctrl+Z)" disabled>↶ Undo</button>
+        <button id="btn-edit-fj" class="purple">⭐ Final Jeopardy</button>
+        <button id="btn-new" class="ghost">New</button>
+        <input type="file" id="import-file" accept=".json,application/json" hidden>
+        <button id="btn-import">📂 Load existing</button>
+        <button id="btn-export" class="warn">⬇ Export game.json</button>
+    </div>
+</header>
 
+<main>
+    <p class="help">
+        Click a tile to write its clue. Use <b>🔀</b> at the start of a row to shuffle that row’s clues between categories
+        (point values stay put). Tick <b>Daily Double</b> inside a clue to pre-select it — or leave that to the moderator.
+    </p>
+    <div id="builder-board" role="grid" aria-label="Game board editor"></div>
+</main>
+
+<!-- Clue modal -->
+<div id="clue-modal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+    <div class="modal-content">
+        <h2 id="modal-title">Edit clue</h2>
+
+        <div class="grid-2">
+            <div>
+                <label for="clue-type">Prompt media</label>
+                <select id="clue-type">
+                    <option value="text">Standard text</option>
+                    <option value="image">Image(s) – comma-separate for several</option>
+                    <option value="video">Local video (media/clip.mp4)</option>
+                    <option value="audio">Local audio (media/song.mp3)</option>
+                    <option value="youtube">YouTube video</option>
+                    <option value="spotify">Spotify track</option>
+                </select>
+            </div>
             <div id="url-container" class="hidden">
-                <label>Prompt Media URL / Path:</label>
-                <input type="text" id="clue-url" placeholder="e.g., https://youtu.be/... or images/pic.jpg">
-            </div>
-
-            <label>Prompt (The Question):</label>
-            <textarea id="clue-prompt" rows="3" placeholder="Enter the prompt here..."></textarea>
-
-            <label>Response (The Answer):</label>
-            <input type="text" id="clue-response" placeholder="Enter the correct answer...">
-
-            <label style="margin-top: 10px;">Response Media Type (Optional):</label>
-            <select id="clue-response-type">
-                <option value="text">None / Standard Text</option>
-                <option value="image">Image(s) (Comma-separate for multiple)</option>
-                <option value="video">Local Video (e.g., media/clip.mp4)</option>
-            </select>
-
-            <div id="response-url-container" class="hidden">
-                <label>Response Media URL / Path:</label>
-                <input type="text" id="clue-response-url" placeholder="e.g., images/answer.jpg">
-            </div>
-
-            <div class="modal-actions">
-                <button id="btn-cancel" class="btn-secondary">Cancel</button>
-                <button id="btn-save-clue" class="btn-primary">Save Clue</button>
+                <label for="clue-url">Prompt media URL / path</label>
+                <input type="text" id="clue-url" placeholder="https://youtu.be/…  or  media/pic.jpg">
             </div>
         </div>
-    </div>
 
-    <script src="builder.js"></script>
+        <div>
+            <label for="clue-prompt">Prompt (the question)</label>
+            <textarea id="clue-prompt" rows="3" placeholder="What the audience sees…"></textarea>
+        </div>
+        <div>
+            <label for="clue-response">Response (the answer)</label>
+            <input type="text" id="clue-response" placeholder="The correct answer…">
+        </div>
+
+        <div class="grid-2">
+            <div>
+                <label for="clue-response-type">Response media (optional)</label>
+                <select id="clue-response-type">
+                    <option value="text">None / standard text</option>
+                    <option value="image">Image(s) – comma-separate for several</option>
+                    <option value="video">Local video (media/clip.mp4)</option>
+                </select>
+            </div>
+            <div id="response-url-container" class="hidden">
+                <label for="clue-response-url">Response media URL / path</label>
+                <input type="text" id="clue-response-url" placeholder="media/answer.jpg">
+            </div>
+        </div>
+
+        <label class="check"><input type="checkbox" id="clue-dd"> ⭐ Make this the <b>Daily Double</b> <span>(optional – the moderator can still change it)</span></label>
+
+        <div class="modal-actions">
+            <button id="btn-cancel" class="btn-secondary">Cancel <kbd>Esc</kbd></button>
+            <button id="btn-save-next" class="primary">Save &amp; next ▶</button>
+            <button id="btn-save-clue" class="success">Save <kbd>Ctrl+↵</kbd></button>
+        </div>
+    </div>
+</div>
+
+<!-- Final Jeopardy modal -->
+<div id="fj-modal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="fj-title">
+    <div class="modal-content">
+        <h2 id="fj-title">Final Jeopardy</h2>
+
+        <div>
+            <label for="build-fj-category">Category</label>
+            <input type="text" id="build-fj-category" placeholder="Final Jeopardy category…">
+        </div>
+
+        <div class="grid-2">
+            <div>
+                <label for="build-fj-type">Prompt media</label>
+                <select id="build-fj-type">
+                    <option value="text">Standard text</option>
+                    <option value="image">Image(s) – comma-separate for several</option>
+                    <option value="video">Local video (media/clip.mp4)</option>
+                    <option value="audio">Local audio (media/song.mp3)</option>
+                    <option value="youtube">YouTube video</option>
+                    <option value="spotify">Spotify track</option>
+                </select>
+            </div>
+            <div id="build-fj-url-container" class="hidden">
+                <label for="build-fj-url">Prompt media URL / path</label>
+                <input type="text" id="build-fj-url" placeholder="https://youtu.be/…  or  media/pic.jpg">
+            </div>
+        </div>
+
+        <div>
+            <label for="build-fj-prompt">Prompt (the question)</label>
+            <textarea id="build-fj-prompt" rows="3" placeholder="The final question…"></textarea>
+        </div>
+        <div>
+            <label for="build-fj-answer">Response (the answer)</label>
+            <input type="text" id="build-fj-answer" placeholder="The final answer…">
+        </div>
+
+        <div class="grid-2">
+            <div>
+                <label for="build-fj-response-type">Response media (optional)</label>
+                <select id="build-fj-response-type">
+                    <option value="text">None / standard text</option>
+                    <option value="image">Image(s) – comma-separate for several</option>
+                    <option value="video">Local video (media/clip.mp4)</option>
+                </select>
+            </div>
+            <div id="build-fj-response-url-container" class="hidden">
+                <label for="build-fj-response-url">Response media URL / path</label>
+                <input type="text" id="build-fj-response-url" placeholder="media/answer.jpg">
+            </div>
+        </div>
+
+        <div class="modal-actions">
+            <button id="btn-cancel-fj" class="btn-secondary">Cancel <kbd>Esc</kbd></button>
+            <button id="btn-save-fj" class="success">Save Final Jeopardy</button>
+        </div>
+    </div>
+</div>
+
+<script src="common.js"></script>
+<script src="builder.js"></script>
 </body>
 </html>

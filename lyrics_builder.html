@@ -3,27 +3,41 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Anime Lyrics Game Builder</title>
+    <title>Lyrics Pack Builder – Trivia Night</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap">
+    <link rel="stylesheet" href="ui.css">
     <link rel="stylesheet" href="builder.css">
+    <style>
+        main { max-width: 900px; }
+        .round-card { display: flex; flex-direction: column; gap: .7rem; margin-bottom: 1rem; }
+        .snippet-row { display: flex; gap: .6rem; align-items: flex-start; }
+        .snippet-row .num { color: var(--gold); font-weight: 800; padding-top: .6rem; min-width: 2rem; }
+        .round-actions { display: flex; gap: .4rem; }
+    </style>
 </head>
 <body>
-    <header>
-        <div class="title-container">
-            <label>Lyrics Pack Title:</label>
-            <input type="text" id="game-title" value="Anime Lyrics Showdown">
+<header class="app-header">
+    <div class="brand">
+        <div class="logo">♪</div>
+        <div class="title-wrap">
+            <input type="text" id="game-title" value="Anime Lyrics Showdown" aria-label="Pack title" spellcheck="false">
+            <div class="subtitle" id="round-count">0 rounds</div>
         </div>
-        <div class="controls">
-            <input type="file" id="import-file" accept=".json" style="display: none;">
-            <button id="btn-import" onclick="document.getElementById('import-file').click()">Load Existing</button>
-            <button id="btn-export">Export lyrics_game.json</button>
-        </div>
-    </header>
+    </div>
+    <div class="toolbar">
+        <input type="file" id="import-file" accept=".json,application/json" hidden>
+        <button id="btn-import">📂 Load existing</button>
+        <button id="btn-export" class="warn">⬇ Export lyrics_game.json</button>
+    </div>
+</header>
 
-    <main style="padding: 20px; display: flex; flex-direction: column; gap: 20px; overflow-y: auto;">
-        <div id="rounds-container" style="display: flex; flex-direction: column; gap: 20px;"></div>
-        <button id="btn-add-round" class="btn-primary" style="padding: 15px; font-size: 1.2rem;">+ Add New Round</button>
-    </main>
+<main>
+    <div id="rounds-container"></div>
+    <button id="btn-add-round" class="primary btn-block" style="padding:1rem">＋ Add round</button>
+</main>
 
-    <script src="lyrics_builder.js"></script>
+<script src="common.js"></script>
+<script src="lyrics_builder.js"></script>
 </body>
 </html>

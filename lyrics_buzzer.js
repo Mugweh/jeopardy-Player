@@ -74,6 +74,14 @@ socket.on('game_event', (data) => {
             document.getElementById('answer-screen').classList.add('hidden');
         }
     }
+    else if (msg.type === 'CLAIM_DENIED') {
+        if (msg.team === myTeam) {
+            myTeam = "";
+            document.getElementById('setup-screen').classList.remove('hidden');
+            document.getElementById('answer-screen').classList.add('hidden');
+            alert('Someone else just picked that team. Please choose another.');
+        }
+    }
     else if (msg.type === 'UPDATE_LYRICS_STATE' || msg.type === 'SYNC_LYRICS_STATE') {
         lyricsState = msg.state;
         updateBuzzerState();

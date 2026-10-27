@@ -62,10 +62,13 @@ function renderPlayerUI(state) {
     Object.keys(scores).forEach(team => {
         const div = document.createElement('div');
         div.className = 'player-team';
-        div.innerHTML = `
-            <div class="team-name">${team}</div>
-            <div class="team-score">${scores[team]}</div>
-        `;
+        const name = document.createElement('div');
+        name.className = 'team-name';
+        name.textContent = team;
+        const score = document.createElement('div');
+        score.className = 'team-score';
+        score.textContent = scores[team];
+        div.append(name, score);
         scoreBoard.appendChild(div);
     });
 }

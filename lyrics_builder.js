@@ -1,110 +1,98 @@
-let packData = {
-    title: "Anime Lyrics Showdown",
-    rounds: []
-};
+'use strict';
+/* Lyrics pack builder. File format is unchanged:
+   { title, rounds: [{ lyrics: ["snippet", ...], answer: "..." }] }
+   Older packs where `lyrics` is a single string still load. */
+
+const { $, el, toast, readJsonFile, downloadJson } = Common;
+
+let packData = { title: 'Anime Lyrics Showdown', rounds: [] };
+let dirty = false;
+const touch = () => { dirty = true; };
+window.addEventListener('beforeunload', e => { if (dirty) { e.preventDefault(); e.returnValue = ''; } });
 
 function renderRounds() {
-    const container = document.getElementById('rounds-container');
-    container.innerHTML = '';
+    const box = $('#rounds-container');
+    box.innerHTML = '';
+    $('#game-title').value = packData.title ?? '';
+    $('#round-count').textContent = `${packData.rounds.length} round${packData.rounds.length === 1 ? '' : 's'}`;
 
-    packData.rounds.forEach((round, rIndex) => {
-        const div = document.createElement('div');
-        div.className = 'panel-section';
-        div.style.background = '#1e1e1e';
-        div.style.padding = '20px';
-        div.style.borderRadius = '8px';
-        div.style.border = '1px solid #333';
-        div.style.display = 'flex';
-        div.style.flexDirection = 'column';
-        div.style.gap = '12px';
+    packData.rounds.forEach((round, r) => {
+        const snippets = round.lyrics.map((text, s) => el('div', { class: 'snippet-row' },
+            el('span', { class: 'num', text: `#${s + 1}` }),
+            el('textarea', {
+                rows: 3, placeholder: `Lyric excerpt ${s + 1}…`, 'aria-label': `Snippet ${s + 1}`,
+                oninput: e => { round.lyrics[s] = e.target.value; touch(); }
+            }, text || ''),
+            round.lyrics.length > 1 && el('button', {
+                class: 'danger sm', text: '✖', title: 'Remove snippet',
+                onclick: () => { round.lyrics.splice(s, 1); touch(); renderRounds(); }
+            })
+        ));
 
-        let lyricsSectionsHtml = '';
-        round.lyrics.forEach((snippet, sIndex) => {
-            lyricsSectionsHtml += `
-                <div style="display: flex; gap: 10px; align-items: flex-start; margin-top: 5px;">
-                    <span style="color: var(--neon-yellow); font-weight: bold; margin-top: 10px;">#${sIndex + 1}</span>
-                    <textarea rows="2" placeholder="Lyric excerpt/section ${sIndex + 1}..." 
-                        style="flex: 1; background:#121212; color:white; border:1px solid #333; padding:10px; border-radius:6px;" 
-                        oninput="packData.rounds[${rIndex}].lyrics[${sIndex}] = this.value">${snippet || ''}</textarea>
-                    ${round.lyrics.length > 1 ? `<button onclick="removeSnippet(${rIndex},${sIndex})" style="background:#ef4444; padding:8px 12px; margin-top:5px; border-radius:6px;">✖</button>` : ''}
-                </div>
-            `;
-        });
-
-        div.innerHTML = `
-            <div style="display: flex; justify-content: space-between; align-items: center;">
-                <h3 style="color: var(--neon-yellow); margin: 0;">Round ${rIndex + 1}</h3>
-                <button class="btn-secondary" onclick="removeRound(${rIndex})" style="background: #ef4444;">Remove Round</button>
-            </div>
-            
-            <label style="color:#ccc; font-weight:bold;">Lyric Sections / Snippets (Cyclable in Moderator):</label>
-            ${lyricsSectionsHtml}
-            <button onclick="addSnippet(${rIndex})" style="background: var(--accent-blue); padding: 6px 12px; align-self: flex-start; margin-top: 5px; border-radius: 6px;">+ Add Snippet Section</button>
-
-            <label style="color:#ccc; font-weight:bold; margin-top: 10px;">Correct Anime Answer:</label>
-            <input type="text" placeholder="e.g., Azumanga Daioh" value="${round.answer || ''}" 
-                style="width:100%; background:#121212; color:white; border:1px solid #333; padding:10px; border-radius:6px;" 
-                oninput="packData.rounds[${rIndex}].answer = this.value">
-        `;
-        container.appendChild(div);
+        box.append(el('div', { class: 'card round-card' },
+            el('div', { class: 'card-head', style: 'margin:0' },
+                el('h3', { style: 'color:var(--gold)', text: `Round ${r + 1}` }),
+                el('div', { class: 'round-actions' },
+                    el('button', { class: 'ghost sm', text: '↑', title: 'Move up', disabled: r === 0, onclick: () => move(r, -1) }),
+                    el('button', { class: 'ghost sm', text: '↓', title: 'Move down', disabled: r === packData.rounds.length - 1, onclick: () => move(r, 1) }),
+                    el('button', { class: 'danger sm', text: 'Remove round', onclick: () => { if (confirm(`Remove round ${r + 1}?`)) { packData.rounds.splice(r, 1); touch(); renderRounds(); } } })
+                )
+            ),
+            el('label', { class: 'field', text: 'Lyric snippets (the moderator can step through these)' }),
+            ...snippets,
+            el('button', { class: 'ghost sm', style: 'align-self:flex-start', text: '＋ Add snippet', onclick: () => { round.lyrics.push(''); touch(); renderRounds(); } }),
+            el('label', { class: 'field', style: 'margin-top:.4rem', text: 'Correct answer' }),
+            el('input', {
+                type: 'text', value: round.answer || '', placeholder: 'e.g. Azumanga Daioh',
+                oninput: e => { round.answer = e.target.value; touch(); }
+            })
+        ));
     });
 }
 
-function addRound() {
+function move(index, delta) {
+    const [round] = packData.rounds.splice(index, 1);
+    packData.rounds.splice(index + delta, 0, round);
+    touch(); renderRounds();
+}
+
+$('#btn-add-round').addEventListener('click', () => {
     packData.rounds.push({ lyrics: [''], answer: '' });
-    renderRounds();
-}
-
-function removeRound(rIndex) {
-    packData.rounds.splice(rIndex, 1);
-    renderRounds();
-}
-
-function addSnippet(rIndex) {
-    packData.rounds[rIndex].lyrics.push('');
-    renderRounds();
-}
-
-function removeSnippet(rIndex, sIndex) {
-    packData.rounds[rIndex].lyrics.splice(sIndex, 1);
-    renderRounds();
-}
-
-document.getElementById('btn-add-round').addEventListener('click', addRound);
-
-document.getElementById('btn-export').addEventListener('click', () => {
-    packData.title = document.getElementById('game-title').value;
-    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(packData, null, 2));
-    const dl = document.createElement('a');
-    dl.setAttribute("href", dataStr);
-    dl.setAttribute("download", "lyrics_game.json");
-    document.body.appendChild(dl);
-    dl.click();
-    dl.remove();
+    touch(); renderRounds();
+    window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
 });
 
-document.getElementById('import-file').addEventListener('change', (e) => {
+$('#game-title').addEventListener('input', e => { packData.title = e.target.value; touch(); });
+
+$('#btn-export').addEventListener('click', () => {
+    packData.title = $('#game-title').value;
+    downloadJson(packData, 'lyrics_game.json');
+    dirty = false;
+    toast('Exported lyrics_game.json.', { type: 'success' });
+});
+
+$('#btn-import').addEventListener('click', () => $('#import-file').click());
+$('#import-file').addEventListener('change', async e => {
     const file = e.target.files[0];
+    e.target.value = '';
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (evt) => {
-        try {
-            const loaded = JSON.parse(evt.target.result);
-            if (loaded.rounds) {
-                // Backward compatibility normalization if lyrics was a single string
-                loaded.rounds.forEach(r => {
-                    if (typeof r.lyrics === 'string') {
-                        r.lyrics = [r.lyrics];
-                    }
-                });
-                packData = loaded;
-                document.getElementById('game-title').value = packData.title || "Anime Lyrics Showdown";
-                renderRounds();
-            }
-        } catch (err) { alert("Invalid JSON format."); }
-    };
-    reader.readAsText(file);
+    try {
+        const loaded = await readJsonFile(file);
+        if (!Array.isArray(loaded.rounds)) throw new Error('This file has no "rounds" list, so it isn’t a lyrics pack.');
+        loaded.rounds.forEach(r => {
+            if (typeof r.lyrics === 'string') r.lyrics = [r.lyrics];
+            if (!Array.isArray(r.lyrics) || !r.lyrics.length) r.lyrics = [''];
+            r.answer = r.answer ?? '';
+        });
+        packData = loaded;
+        if (packData.title == null) packData.title = 'Anime Lyrics Showdown';
+        dirty = false;
+        renderRounds();
+        toast('Pack loaded.', { type: 'success' });
+    } catch (err) {
+        toast(err.message, { type: 'error' });
+    }
 });
 
-// Initialize with one blank round
-addRound();
+packData.rounds.push({ lyrics: [''], answer: '' });
+renderRounds();
